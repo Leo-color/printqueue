@@ -318,8 +318,9 @@ def slice_file():
     if "file" not in request.files:
         return jsonify({"ok": False, "error": "Nessun file"}), 400
     f = request.files["file"]
-    if not f.filename.endswith(".stl"):
-        return jsonify({"ok": False, "error": "Serve un file .stl"}), 400
+    ALLOWED = (".stl", ".obj", ".3mf")
+    if not any(f.filename.lower().endswith(e) for e in ALLOWED):
+        return jsonify({"ok": False, "error": "Formati supportati: STL, OBJ, 3MF"}), 400
 
     # Save STL
     stl_path = UPLOAD_FOLDER / f.filename
@@ -486,8 +487,8 @@ button{width:100%;margin-top:8px;padding:8px;border:none;border-radius:7px;font-
     <!-- STL tab -->
     <div id="panel-stl" style="display:none">
       <div class="dz" id="dz-stl" onclick="document.getElementById('fi-stl').click()">
-        <p>Trascina file .stl qui<br>oppure clicca per scegliere</p>
-        <input id="fi-stl" type="file" accept=".stl" onchange="selectStl(this.files[0])">
+        <p>Trascina file STL, OBJ o 3MF qui<br>oppure clicca per scegliere</p>
+        <input id="fi-stl" type="file" accept=".stl,.obj,.3mf" onchange="selectStl(this.files[0])">
       </div>
       <div id="stl-settings" style="display:none;margin-top:10px">
         <div style="font-size:.78rem;color:#aaa;margin-bottom:8px" id="stl-name"></div>
@@ -538,6 +539,10 @@ const dz=document.getElementById('dz');
 dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('ov')});
 dz.addEventListener('dragleave',()=>dz.classList.remove('ov'));
 dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('ov');upload(e.dataTransfer.files)});
+const dzs=document.getElementById('dz-stl');
+dzs.addEventListener('dragover',e=>{e.preventDefault();dzs.classList.add('ov')});
+dzs.addEventListener('dragleave',()=>dzs.classList.remove('ov'));
+dzs.addEventListener('drop',e=>{e.preventDefault();dzs.classList.remove('ov');selectStl(e.dataTransfer.files[0])});
 
 async function post(url,body){return fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json())}
 
