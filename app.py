@@ -164,7 +164,7 @@ def connect():
         p = BambuCloud(email, password, serial)
         ok = p.login()
         if not ok:
-            return jsonify({"ok": False, "error": "Login fallito — controlla email e password"}), 401
+            return jsonify({"ok": False, "error": "Login fallito — controlla email e password Bambu"})
         p.connect_mqtt()
         printer = p
         log(f"Connesso al cloud Bambu — serial: {serial}")
@@ -246,7 +246,12 @@ def set_cooldown():
 def manual_eject():
     if not printer:
         return jsonify({"ok": False, "error": "Non connesso"})
-    h = float(request.json.get("piece_height", 5))
+    # Auto-detect height from last done/printing job, fallback to 10mm
+    h = 10.0
+    for j in reversed(queue):
+        if j["status"] in ("done", "printing", "preparing"):
+            h = BambuCloud.extract_piece_height(j["path"])
+            break
     cx = PLATE_X / 2
     by = PLATE_Y - 2
     pz = max(h - 2, 1)
@@ -258,7 +263,7 @@ def manual_eject():
         f"G1 Y{by} F6000",
         "G28 X Y",
     ])
-    log("Espulsione manuale inviata")
+    log(f"Espulsione manuale inviata (altezza rilevata: {h:.1f}mm)")
     return jsonify({"ok": True})
 
 
@@ -358,11 +363,7 @@ button{width:100%;margin-top:8px;padding:8px;border:none;border-radius:7px;font-
     <label>Raffreddamento (secondi)</label>
     <input id="cool" type="number" value="300" min="30" max="3600">
     <button class="q" onclick="saveCool()">Salva</button>
-    <label>Altezza pezzo — test espulsione (mm)</label>
-    <div class="row">
-      <input id="eh" type="number" value="5" min="1" style="width:70px">
-      <button class="q" style="width:auto;flex:1" onclick="eject()">Test espulsione</button>
-    </div>
+    <button class="q" onclick="eject()" style="margin-top:10px">Test espulsione manuale</button>
   </div>
   <div class="card">
     <h2>Stato Stampante</h2>
@@ -413,7 +414,7 @@ async function startAuto(){const d=await post('/api/start',{});if(!d.ok)alert(d.
 async function stopAuto(){await post('/api/stop',{});refresh()}
 async function saveCool(){await post('/api/cooldown',{seconds:parseInt(document.getElementById('cool').value)})}
 async function eject(){
-  const d=await post('/api/eject',{piece_height:parseFloat(document.getElementById('eh').value)});
+  const d=await post('/api/eject',{});
   if(!d.ok)alert(d.error);
 }
 async function removeJob(n){await post('/api/remove',{name:n});refresh()}
