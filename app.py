@@ -7,16 +7,29 @@ Runs on Railway — accessible from anywhere.
 import os
 import time
 import threading
+import hashlib
 from pathlib import Path
-from flask import Flask, request, jsonify, render_template_string, send_from_directory
+from functools import wraps
+from flask import Flask, request, jsonify, render_template_string, send_from_directory, session, redirect, url_for
 from dotenv import load_dotenv
 from bambu import BambuCloud
 
 load_dotenv()
 
 app = Flask(__name__)
+app.secret_key = os.getenv("SECRET_KEY", "pq_secret_x9z2k")
 UPLOAD_FOLDER = Path("uploads")
 UPLOAD_FOLDER.mkdir(exist_ok=True)
+
+SITE_PASSWORD = "Leonardo Carlo Manzone"
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("logged_in"):
+            return redirect(url_for("login_page"))
+        return f(*args, **kwargs)
+    return decorated
 
 # ── Global state ──────────────────────────────────────────────────────────────
 
@@ -109,16 +122,36 @@ def automation_loop():
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
+@app.route("/login", methods=["GET"])
+def login_page():
+    return render_template_string(LOGIN_TEMPLATE)
+
+@app.route("/login", methods=["POST"])
+def do_login():
+    pw = request.form.get("password", "")
+    if pw == SITE_PASSWORD:
+        session["logged_in"] = True
+        return redirect(url_for("index"))
+    return render_template_string(LOGIN_TEMPLATE, error="Password errata")
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login_page"))
+
 @app.route("/")
+@login_required
 def index():
     return render_template_string(HTML_TEMPLATE)
 
 @app.route("/files/<filename>")
+@login_required
 def serve_gcode(filename):
     """Printer downloads the gcode file from here."""
     return send_from_directory(UPLOAD_FOLDER, filename)
 
 @app.route("/api/connect", methods=["POST"])
+@login_required
 def connect():
     global printer
     data = request.json
@@ -140,6 +173,7 @@ def connect():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 @app.route("/api/status")
+@login_required
 def status():
     st = printer.get_status() if printer else {}
     return jsonify({
@@ -153,6 +187,7 @@ def status():
     })
 
 @app.route("/api/upload", methods=["POST"])
+@login_required
 def upload():
     files = request.files.getlist("files")
     added = []
@@ -167,6 +202,7 @@ def upload():
     return jsonify({"ok": True, "added": added})
 
 @app.route("/api/remove", methods=["POST"])
+@login_required
 def remove():
     name = request.json.get("name")
     for j in queue:
@@ -177,6 +213,7 @@ def remove():
     return jsonify({"ok": False, "error": "Job non trovato o in corso"})
 
 @app.route("/api/start", methods=["POST"])
+@login_required
 def start_auto():
     global automation_thread, running
     if running:
@@ -189,6 +226,7 @@ def start_auto():
     return jsonify({"ok": True})
 
 @app.route("/api/stop", methods=["POST"])
+@login_required
 def stop_auto():
     global running
     running = False
@@ -196,6 +234,7 @@ def stop_auto():
     return jsonify({"ok": True})
 
 @app.route("/api/cooldown", methods=["POST"])
+@login_required
 def set_cooldown():
     global COOLDOWN_SECONDS
     COOLDOWN_SECONDS = max(30, min(int(request.json.get("seconds", 300)), 3600))
@@ -203,6 +242,7 @@ def set_cooldown():
     return jsonify({"ok": True, "seconds": COOLDOWN_SECONDS})
 
 @app.route("/api/eject", methods=["POST"])
+@login_required
 def manual_eject():
     if not printer:
         return jsonify({"ok": False, "error": "Non connesso"})
@@ -223,6 +263,40 @@ def manual_eject():
 
 
 # ── HTML ──────────────────────────────────────────────────────────────────────
+
+LOGIN_TEMPLATE = """<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Print Queue — Accesso</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:#0f0f0f;color:#e0e0e0;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.box{background:#1a1a1a;border:1px solid #272727;border-radius:14px;padding:36px 32px;width:100%;max-width:340px}
+h1{font-size:1rem;font-weight:600;color:#fff;margin-bottom:6px}
+p{font-size:.78rem;color:#555;margin-bottom:24px}
+label{display:block;font-size:.75rem;color:#777;margin-bottom:5px}
+input[type=password]{width:100%;background:#111;border:1px solid #2e2e2e;border-radius:7px;padding:10px 12px;color:#ddd;font-size:.9rem;outline:none;margin-bottom:14px}
+input:focus{border-color:#4f8ef7}
+button{width:100%;padding:10px;background:#4f8ef7;color:#fff;border:none;border-radius:7px;font-size:.88rem;font-weight:500;cursor:pointer}
+button:hover{background:#3a7ae0}
+.err{background:#450a0a;color:#f87171;border-radius:6px;padding:8px 12px;font-size:.78rem;margin-bottom:14px}
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>Print Queue</h1>
+  <p>Inserisci la password per accedere</p>
+  {% if error %}<div class="err">{{ error }}</div>{% endif %}
+  <form method="POST" action="/login">
+    <label>Password</label>
+    <input type="password" name="password" placeholder="••••••••••••••••" autofocus>
+    <button type="submit">Entra</button>
+  </form>
+</div>
+</body>
+</html>"""
 
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="it">
