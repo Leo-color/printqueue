@@ -42,6 +42,25 @@ running = False
 
 COOLDOWN_SECONDS = 300
 PLATE_X = 256.0   # Bambu A1
+
+def auto_connect():
+    """Connect to Bambu cloud automatically using env vars at startup."""
+    global printer
+    email = os.getenv("BAMBU_EMAIL", "")
+    password = os.getenv("BAMBU_PASSWORD", "")
+    serial = os.getenv("BAMBU_SERIAL", "")
+    if not (email and password and serial):
+        return
+    try:
+        p = BambuCloud(email, password, serial)
+        if p.login():
+            p.connect_mqtt()
+            printer = p
+            log("Connesso automaticamente al cloud Bambu")
+        else:
+            log("Auto-connessione fallita — controlla le variabili d'ambiente")
+    except Exception as e:
+        log(f"Auto-connessione errore: {e}")
 PLATE_Y = 256.0
 BASE_URL = os.getenv("BASE_URL", "http://localhost:5000")  # set this on Railway
 
@@ -351,12 +370,8 @@ button{width:100%;margin-top:8px;padding:8px;border:none;border-radius:7px;font-
 <div class="grid">
 <div>
   <div class="card">
-    <h2>Account Bambu</h2>
-    <label>Email</label><input id="email" type="email" placeholder="tu@email.com">
-    <label>Password</label><input id="pass" type="password" placeholder="••••••••">
-    <label>Serial Number</label><input id="serial" type="text" placeholder="00M00A000000000">
-    <button class="p" onclick="connect()">Connetti</button>
-    <div id="cs" style="font-size:.72rem;color:#555;margin-top:7px;text-align:center"></div>
+    <h2>Stampante</h2>
+    <div id="cs" style="font-size:.82rem;color:#555;padding:4px 0">Controllo connessione...</div>
   </div>
   <div class="card">
     <h2>Impostazioni</h2>
@@ -398,12 +413,6 @@ dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('ov');uplo
 
 async function post(url,body){return fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json())}
 
-async function connect(){
-  document.getElementById('cs').textContent='Connessione...';
-  const d=await post('/api/connect',{email:document.getElementById('email').value.trim(),password:document.getElementById('pass').value,serial:document.getElementById('serial').value.trim()});
-  document.getElementById('cs').innerHTML=d.ok?'<span class="dot dg"></span>Connesso':'<span class="dot dr"></span>'+d.error;
-  if(d.ok)refresh();
-}
 async function upload(files){
   const fd=new FormData();
   for(const f of files)fd.append('files',f);
@@ -446,6 +455,8 @@ refresh();
 </script>
 </body>
 </html>"""
+
+auto_connect()
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))
