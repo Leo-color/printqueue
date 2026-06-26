@@ -1,126 +1,96 @@
 """
-PrusaSlicer wrapper for Bambu Lab A1 (256x256mm bed, 0.4mm nozzle).
-Installed via build.sh during Render deploy.
+Slic3r lightweight slicer for Bambu Lab A1.
+Simple, reliable, ~30MB, works on Render.
 """
 
 import os
 import subprocess
-import tempfile
 from pathlib import Path
 
-# PrusaSlicer binary: prefer the one installed by build.sh into ./vendor,
-# next to this file. Fall back to env var or system PATH.
-_HERE = Path(__file__).resolve().parent
-_CANDIDATES = [
-    _HERE / "vendor" / "squashfs-root" / "usr" / "bin" / "prusa-slicer",
-    _HERE / "vendor" / "prusa-slicer",
-    Path(os.getenv("PRUSASLICER_BIN", "")) if os.getenv("PRUSASLICER_BIN") else None,
-    Path("/usr/bin/prusa-slicer"),
-]
-
-def _find_bin() -> str:
-    for c in _CANDIDATES:
-        if c and Path(c).exists():
+def _find_slic3r() -> str:
+    candidates = [
+        Path(__file__).parent / "vendor" / "slic3r",
+        Path(__file__).parent / "vendor" / "Slic3r" / "slic3r.pl",
+        Path("/usr/bin/slic3r"),
+    ]
+    for c in candidates:
+        if c.exists():
             return str(c)
-    return "prusa-slicer"  # last resort: PATH
+    return "slic3r"
 
-PRUSA_BIN = _find_bin()
-
-# Bambu A1 base config
-BAMBU_A1_CONFIG = """
-[printer]
-bed_shape = 0x0,256x0,256x256,0x256
-max_print_height = 256
-nozzle_diameter = 0.4
-filament_diameter = 1.75
-printer_technology = FFF
-extruder_count = 1
-default_filament_profile = Generic PLA
-default_print_profile = 0.20mm Quality
-
-[print]
-layer_height = {layer_height}
-perimeters = 3
-fill_density = {infill}%
-fill_pattern = gyroid
-support_material = {supports}
-support_material_style = {support_style}
-support_material_threshold = 45
-brim_width = 0
-skirts = 1
-
-[filament]
-filament_type = PLA
-filament_colour = {color}
-temperature = 220
-bed_temperature = 35
-"""
-
+SLIC3R = _find_slic3r()
 
 def slice_stl(
-    stl_path: str,
-    output_dir: str,
+    input_file: str,
+    output_dir: str = None,
     layer_height: float = 0.2,
     infill: int = 15,
-    supports: str = "none",   # "none", "normal", "tree"
+    supports: str = "none",  # "none", "linear", "grid", "tree"
     filament_color: str = "#FF8000",
+    plate_x_mm: float = 256.0,
+    plate_y_mm: float = 256.0,
+    cooldown_seconds: int = 300,
+    piece_height_mm: float = 5.0,
+    **kwargs
 ) -> tuple[bool, str, str]:
     """
-    Slice an STL file using PrusaSlicer CLI.
-    Returns (success, gcode_path, message).
+    Slice STL/OBJ/3MF with Slic3r.
+    Returns (success, output_gcode_path, message).
     """
-    stl_path = Path(stl_path)
-    out_path = Path(output_dir) / (stl_path.stem + ".gcode")
+    input_path = Path(input_file)
+    if not input_path.exists():
+        return False, "", f"File not found: {input_file}"
 
-    # Build config ini
-    support_enabled = "1" if supports != "none" else "0"
-    support_style = "tree" if supports == "tree" else "normal"
+    output_dir = Path(output_dir or input_path.parent)
+    output_gcode = output_dir / (input_path.stem + ".gcode")
 
-    config_content = BAMBU_A1_CONFIG.format(
-        layer_height=layer_height,
-        infill=infill,
-        supports=support_enabled,
-        support_style=support_style,
-        color=filament_color,
-    )
+    # Slic3r CLI args for Bambu A1
+    cmd = [
+        _find_slic3r(),
+        "--layer-height", str(layer_height),
+        "--infill-density", str(infill),
+        "--perimeters", "3",
+        "--bed-size", f"{int(plate_x_mm)},{int(plate_y_mm)}",
+        "--nozzle-diameter", "0.4",
+        "--filament-diameter", "1.75",
+        "--extrusion-width", "0.4",
+    ]
 
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".ini", delete=False) as f:
-        f.write(config_content)
-        config_path = f.name
+    if supports != "none":
+        cmd += ["--support-material"]
+        if supports == "tree":
+            cmd += ["--support-material-style", "tree"]
+
+    cmd += [
+        "--output", str(output_gcode),
+        str(input_path),
+    ]
 
     try:
-        cmd = [
-            _find_bin(),
-            "--slice",
-            "--export-gcode",
-            "--load", config_path,
-            "--output", str(out_path),
-            str(stl_path),
-        ]
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=600,  # 10 min max
-        )
-        if result.returncode == 0 and out_path.exists():
-            return True, str(out_path), "Slicing completato"
-        else:
-            err = result.stderr[-500:] if result.stderr else "Errore sconosciuto"
-            return False, "", f"Slicing fallito: {err}"
-    except subprocess.TimeoutExpired:
-        return False, "", "Slicing timeout (file troppo complesso)"
-    except FileNotFoundError:
-        return False, "", "PrusaSlicer non trovato — controlla PRUSASLICER_BIN"
-    except Exception as e:
-        return False, "", str(e)
-    finally:
-        os.unlink(config_path)
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
 
+        if r.returncode != 0:
+            err = (r.stderr or r.stdout)[-200:]
+            return False, "", f"Slic3r error: {err}"
+
+        if not output_gcode.exists():
+            return False, "", "No output file generated"
+
+        # Success
+        size_mb = output_gcode.stat().st_size / (1024 * 1024)
+        return True, str(output_gcode), f"Done ({size_mb:.1f}MB)"
+
+    except subprocess.TimeoutExpired:
+        return False, "", "Slicing timeout (5 min)"
+    except FileNotFoundError:
+        return False, "", f"Slic3r not found. Reinstall: bash build.sh"
+    except Exception as e:
+        return False, "", f"Error: {str(e)[:100]}"
 
 def prusaslicer_available() -> bool:
+    """Check if Slic3r is available."""
     try:
-        r = subprocess.run([_find_bin(), "--version"], capture_output=True, timeout=5)
+        r = subprocess.run([_find_slic3r(), "--version"], capture_output=True, timeout=5)
         return r.returncode == 0
     except Exception:
         return False

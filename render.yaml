@@ -15,5 +15,3 @@ services:
         sync: false
       - key: BASE_URL
         sync: false
-      - key: PRUSASLICER_BIN
-        value: /opt/prusaslicer/prusa-slicer
