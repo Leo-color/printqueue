@@ -8,8 +8,23 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-# PrusaSlicer binary path (extracted AppImage on Render, or system install)
-PRUSA_BIN = os.getenv("PRUSASLICER_BIN", "/opt/prusaslicer/prusa-slicer")
+# PrusaSlicer binary: prefer the one installed by build.sh into ./vendor,
+# next to this file. Fall back to env var or system PATH.
+_HERE = Path(__file__).resolve().parent
+_CANDIDATES = [
+    _HERE / "vendor" / "squashfs-root" / "usr" / "bin" / "prusa-slicer",
+    _HERE / "vendor" / "prusa-slicer",
+    Path(os.getenv("PRUSASLICER_BIN", "")) if os.getenv("PRUSASLICER_BIN") else None,
+    Path("/usr/bin/prusa-slicer"),
+]
+
+def _find_bin() -> str:
+    for c in _CANDIDATES:
+        if c and Path(c).exists():
+            return str(c)
+    return "prusa-slicer"  # last resort: PATH
+
+PRUSA_BIN = _find_bin()
 
 # Bambu A1 base config
 BAMBU_A1_CONFIG = """
@@ -75,7 +90,7 @@ def slice_stl(
 
     try:
         cmd = [
-            PRUSA_BIN,
+            _find_bin(),
             "--slice",
             "--export-gcode",
             "--load", config_path,
@@ -105,7 +120,7 @@ def slice_stl(
 
 def prusaslicer_available() -> bool:
     try:
-        r = subprocess.run([PRUSA_BIN, "--version"], capture_output=True, timeout=5)
+        r = subprocess.run([_find_bin(), "--version"], capture_output=True, timeout=5)
         return r.returncode == 0
     except Exception:
         return False
