@@ -13,6 +13,7 @@ from functools import wraps
 from flask import Flask, request, jsonify, render_template_string, send_from_directory, session, redirect, url_for
 from dotenv import load_dotenv
 from bambu import BambuCloud
+from slicer import slice_stl, prusaslicer_available
 
 load_dotenv()
 
@@ -286,6 +287,85 @@ def manual_eject():
     return jsonify({"ok": True})
 
 
+@app.route("/api/ams")
+@login_required
+def get_ams():
+    """Return AMS filament slots from printer status."""
+    if not printer:
+        return jsonify({"ok": False, "slots": []})
+    st = printer.get_status()
+    slots = []
+    ams_data = st.get("ams", {})
+    ams_list = ams_data.get("ams", []) if isinstance(ams_data, dict) else []
+    for ams_unit in ams_list:
+        for tray in ams_unit.get("tray", []):
+            slots.append({
+                "id": tray.get("id", ""),
+                "color": "#" + tray.get("tray_color", "FFFFFF")[:6],
+                "material": tray.get("tray_type", "PLA"),
+                "name": tray.get("tray_sub_brands", tray.get("tray_type", "PLA")),
+            })
+    # Also check single-color (no AMS)
+    if not slots:
+        slots.append({"id": "0", "color": "#FF8000", "material": "PLA", "name": "Filamento caricato"})
+    return jsonify({"ok": True, "slots": slots})
+
+
+@app.route("/api/slice", methods=["POST"])
+@login_required
+def slice_file():
+    """Slice an STL file and add the resulting gcode to the queue."""
+    if "file" not in request.files:
+        return jsonify({"ok": False, "error": "Nessun file"}), 400
+    f = request.files["file"]
+    if not f.filename.endswith(".stl"):
+        return jsonify({"ok": False, "error": "Serve un file .stl"}), 400
+
+    # Save STL
+    stl_path = UPLOAD_FOLDER / f.filename
+    f.save(str(stl_path))
+
+    # Slicing settings from form
+    layer_height = float(request.form.get("layer_height", 0.2))
+    infill = int(request.form.get("infill", 15))
+    supports = request.form.get("supports", "none")
+    filament_color = request.form.get("color", "#FF8000")
+
+    log(f"Slicing: {f.filename} | layer={layer_height}mm | infill={infill}% | supporti={supports}")
+
+    # Add to queue as "slicing" status immediately
+    job = {"name": f.filename, "path": str(stl_path), "status": "slicing", "type": "stl"}
+    queue.append(job)
+
+    # Run slicing in background thread
+    def do_slice():
+        ok, gcode_path, msg = slice_stl(
+            str(stl_path), str(UPLOAD_FOLDER),
+            layer_height=layer_height,
+            infill=infill,
+            supports=supports,
+            filament_color=filament_color,
+        )
+        if ok:
+            job["path"] = gcode_path
+            job["name"] = Path(gcode_path).name
+            job["status"] = "queued"
+            job["type"] = "gcode"
+            log(f"Slicing completato: {job['name']}")
+        else:
+            job["status"] = "error"
+            log(f"Slicing fallito: {msg}")
+
+    threading.Thread(target=do_slice, daemon=True).start()
+    return jsonify({"ok": True, "message": "Slicing avviato (~3-5 min)"})
+
+
+@app.route("/api/slicer_status")
+@login_required
+def slicer_status():
+    return jsonify({"available": prusaslicer_available()})
+
+
 # ── HTML ──────────────────────────────────────────────────────────────────────
 
 LOGIN_TEMPLATE = """<!DOCTYPE html>
@@ -387,13 +467,61 @@ button{width:100%;margin-top:8px;padding:8px;border:none;border-radius:7px;font-
   </div>
 </div>
 <div>
+  <!-- Upload tabs -->
   <div class="card">
-    <h2>Coda di Stampa</h2>
-    <div class="dz" id="dz" onclick="document.getElementById('fi').click()">
-      <p>Trascina file .gcode qui<br>oppure clicca per scegliere</p>
-      <input id="fi" type="file" accept=".gcode" multiple onchange="upload(this.files)">
+    <h2>Aggiungi alla Coda</h2>
+    <div style="display:flex;gap:0;margin-bottom:12px">
+      <button id="tab-gcode" class="p" style="border-radius:7px 0 0 7px;margin:0;flex:1" onclick="setTab('gcode')">G-code</button>
+      <button id="tab-stl" class="q" style="border-radius:0 7px 7px 0;margin:0;flex:1" onclick="setTab('stl')">STL + Slicing</button>
     </div>
-    <div id="ql"></div>
+
+    <!-- GCODE tab -->
+    <div id="panel-gcode">
+      <div class="dz" id="dz" onclick="document.getElementById('fi').click()">
+        <p>Trascina file .gcode qui<br>oppure clicca per scegliere</p>
+        <input id="fi" type="file" accept=".gcode" multiple onchange="upload(this.files)">
+      </div>
+    </div>
+
+    <!-- STL tab -->
+    <div id="panel-stl" style="display:none">
+      <div class="dz" id="dz-stl" onclick="document.getElementById('fi-stl').click()">
+        <p>Trascina file .stl qui<br>oppure clicca per scegliere</p>
+        <input id="fi-stl" type="file" accept=".stl" onchange="selectStl(this.files[0])">
+      </div>
+      <div id="stl-settings" style="display:none;margin-top:10px">
+        <div style="font-size:.78rem;color:#aaa;margin-bottom:8px" id="stl-name"></div>
+
+        <!-- Filament color from AMS -->
+        <label>Colore filamento (da AMS)</label>
+        <div id="ams-slots" style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px"></div>
+
+        <label>Altezza layer</label>
+        <select id="sl-layer" style="width:100%;background:#111;border:1px solid #2e2e2e;border-radius:6px;padding:7px;color:#ddd;font-size:.82rem;margin-bottom:8px">
+          <option value="0.1">0.1mm (Fine)</option>
+          <option value="0.2" selected>0.2mm (Standard)</option>
+          <option value="0.3">0.3mm (Veloce)</option>
+        </select>
+
+        <label>Riempimento</label>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <input type="range" id="sl-infill" min="5" max="100" value="15" style="flex:1" oninput="document.getElementById('infill-val').textContent=this.value+'%'">
+          <span id="infill-val" style="font-size:.8rem;color:#aaa;width:35px">15%</span>
+        </div>
+
+        <label>Supporti</label>
+        <select id="sl-supports" style="width:100%;background:#111;border:1px solid #2e2e2e;border-radius:6px;padding:7px;color:#ddd;font-size:.82rem;margin-bottom:12px">
+          <option value="none">Nessuno</option>
+          <option value="normal">Normali</option>
+          <option value="tree">Albero (Tree)</option>
+        </select>
+
+        <button class="p" onclick="sliceAndQueue()" id="slice-btn">Slicia e aggiungi</button>
+        <div id="slice-msg" style="font-size:.72rem;color:#f59e0b;margin-top:6px;display:none">Slicing in corso (~3-5 min)...</div>
+      </div>
+    </div>
+
+    <div id="ql" style="margin-top:10px"></div>
     <div class="row" style="margin-top:10px">
       <button class="g" onclick="startAuto()">▶ Avvia</button>
       <button class="r" onclick="stopAuto()">■ Stop</button>
@@ -425,6 +553,63 @@ async function saveCool(){await post('/api/cooldown',{seconds:parseInt(document.
 async function eject(){
   const d=await post('/api/eject',{});
   if(!d.ok)alert(d.error);
+}
+
+// ── STL / Slicing ──
+let selectedStlFile = null;
+let selectedColor = '#FF8000';
+
+function setTab(t){
+  document.getElementById('panel-gcode').style.display = t==='gcode'?'':'none';
+  document.getElementById('panel-stl').style.display = t==='stl'?'':'none';
+  document.getElementById('tab-gcode').className = t==='gcode'?'p':'q';
+  document.getElementById('tab-stl').className = t==='stl'?'p':'q';
+  if(t==='stl') loadAmsSlots();
+}
+
+async function loadAmsSlots(){
+  const r = await fetch('/api/ams');
+  const d = await r.json();
+  const box = document.getElementById('ams-slots');
+  box.innerHTML = '';
+  for(const s of d.slots){
+    const btn = document.createElement('div');
+    btn.title = s.material + ' — ' + s.name;
+    btn.style.cssText = `width:32px;height:32px;border-radius:50%;background:${s.color};cursor:pointer;border:3px solid transparent;transition:.15s`;
+    btn.onclick = () => {
+      document.querySelectorAll('#ams-slots div').forEach(b=>b.style.borderColor='transparent');
+      btn.style.borderColor='#fff';
+      selectedColor = s.color;
+    };
+    // Select first by default
+    if(!box.children.length){ btn.style.borderColor='#fff'; selectedColor=s.color; }
+    box.appendChild(btn);
+  }
+}
+
+function selectStl(file){
+  if(!file) return;
+  selectedStlFile = file;
+  document.getElementById('stl-settings').style.display='';
+  document.getElementById('stl-name').textContent = '📄 ' + file.name;
+  loadAmsSlots();
+}
+
+async function sliceAndQueue(){
+  if(!selectedStlFile){ alert('Seleziona prima un file STL'); return; }
+  const fd = new FormData();
+  fd.append('file', selectedStlFile);
+  fd.append('layer_height', document.getElementById('sl-layer').value);
+  fd.append('infill', document.getElementById('sl-infill').value);
+  fd.append('supports', document.getElementById('sl-supports').value);
+  fd.append('color', selectedColor);
+  document.getElementById('slice-btn').disabled = true;
+  document.getElementById('slice-msg').style.display = '';
+  const r = await fetch('/api/slice', {method:'POST', body:fd});
+  const d = await r.json();
+  if(!d.ok){ alert(d.error); }
+  document.getElementById('slice-btn').disabled = false;
+  refresh();
 }
 async function removeJob(n){await post('/api/remove',{name:n});refresh()}
 
