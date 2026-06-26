@@ -45,20 +45,35 @@ COOLDOWN_SECONDS = 300
 PLATE_X = 256.0   # Bambu A1
 
 def auto_connect():
-    """Connect to Bambu cloud automatically using env vars at startup."""
+    """Connect to Bambu cloud. Uses BAMBU_TOKEN+BAMBU_UID if set, else email/password."""
     global printer
-    email = os.getenv("BAMBU_EMAIL", "")
-    password = os.getenv("BAMBU_PASSWORD", "")
     serial = os.getenv("BAMBU_SERIAL", "")
-    if not (email and password and serial):
+    if not serial:
+        log("BAMBU_SERIAL mancante nelle variabili d'ambiente")
         return
     try:
+        token = os.getenv("BAMBU_TOKEN", "")
+        uid = os.getenv("BAMBU_UID", "")
+        if token and uid:
+            # Direct token — no login needed (avoids 403 from cloud IP)
+            p = BambuCloud("", "", serial, token=token, uid=uid)
+            p.connect_mqtt()
+            printer = p
+            log("Connesso al cloud Bambu (token diretto)")
+            return
+
+        # Fallback: email/password login
+        email = os.getenv("BAMBU_EMAIL", "")
+        password = os.getenv("BAMBU_PASSWORD", "")
+        if not (email and password):
+            log("Mancano credenziali — imposta BAMBU_TOKEN+BAMBU_UID oppure BAMBU_EMAIL+BAMBU_PASSWORD")
+            return
         p = BambuCloud(email, password, serial)
         ok, err = p.login()
         if ok:
             p.connect_mqtt()
             printer = p
-            log("Connesso automaticamente al cloud Bambu")
+            log("Connesso al cloud Bambu (email/password)")
         else:
             log(f"Auto-connessione fallita: {err}")
     except Exception as e:
@@ -472,21 +487,8 @@ button{width:100%;margin-top:8px;padding:8px;border:none;border-radius:7px;font-
   <!-- Upload tabs -->
   <div class="card">
     <h2>Aggiungi alla Coda</h2>
-    <div style="display:flex;gap:0;margin-bottom:12px">
-      <button id="tab-gcode" class="p" style="border-radius:7px 0 0 7px;margin:0;flex:1" onclick="setTab('gcode')">G-code</button>
-      <button id="tab-stl" class="q" style="border-radius:0 7px 7px 0;margin:0;flex:1" onclick="setTab('stl')">STL + Slicing</button>
-    </div>
-
-    <!-- GCODE tab -->
-    <div id="panel-gcode">
-      <div class="dz" id="dz" onclick="document.getElementById('fi').click()">
-        <p>Trascina file .gcode qui<br>oppure clicca per scegliere</p>
-        <input id="fi" type="file" accept=".gcode" multiple onchange="upload(this.files)">
-      </div>
-    </div>
-
-    <!-- STL tab -->
-    <div id="panel-stl" style="display:none">
+    <!-- Solo STL/OBJ/3MF -->
+    <div id="panel-stl">
       <div class="dz" id="dz-stl" onclick="document.getElementById('fi-stl').click()">
         <p>Trascina file STL, OBJ o 3MF qui<br>oppure clicca per scegliere</p>
         <input id="fi-stl" type="file" accept=".stl,.obj,.3mf" onchange="selectStl(this.files[0])">
@@ -536,23 +538,12 @@ button{width:100%;margin-top:8px;padding:8px;border:none;border-radius:7px;font-
 </div>
 </div>
 <script>
-const dz=document.getElementById('dz');
-dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('ov')});
-dz.addEventListener('dragleave',()=>dz.classList.remove('ov'));
-dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('ov');upload(e.dataTransfer.files)});
 const dzs=document.getElementById('dz-stl');
 dzs.addEventListener('dragover',e=>{e.preventDefault();dzs.classList.add('ov')});
 dzs.addEventListener('dragleave',()=>dzs.classList.remove('ov'));
 dzs.addEventListener('drop',e=>{e.preventDefault();dzs.classList.remove('ov');selectStl(e.dataTransfer.files[0])});
 
 async function post(url,body){return fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json())}
-
-async function upload(files){
-  const fd=new FormData();
-  for(const f of files)fd.append('files',f);
-  await fetch('/api/upload',{method:'POST',body:fd});
-  refresh();
-}
 async function startAuto(){const d=await post('/api/start',{});if(!d.ok)alert(d.error);else refresh()}
 async function stopAuto(){await post('/api/stop',{});refresh()}
 async function saveCool(){await post('/api/cooldown',{seconds:parseInt(document.getElementById('cool').value)})}
@@ -565,13 +556,6 @@ async function eject(){
 let selectedStlFile = null;
 let selectedColor = '#FF8000';
 
-function setTab(t){
-  document.getElementById('panel-gcode').style.display = t==='gcode'?'':'none';
-  document.getElementById('panel-stl').style.display = t==='stl'?'':'none';
-  document.getElementById('tab-gcode').className = t==='gcode'?'p':'q';
-  document.getElementById('tab-stl').className = t==='stl'?'p':'q';
-  if(t==='stl') loadAmsSlots();
-}
 
 async function loadAmsSlots(){
   const r = await fetch('/api/ams');

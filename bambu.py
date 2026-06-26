@@ -45,12 +45,12 @@ G28 X Y
 
 
 class BambuCloud:
-    def __init__(self, email: str, password: str, serial: str):
+    def __init__(self, email: str, password: str, serial: str, token: str = "", uid: str = ""):
         self.email = email
         self.password = password
         self.serial = serial
-        self.token = None
-        self.uid = None
+        self.token = token or None
+        self.uid = uid or None
         self._client = None
         self.connected = False
         self.status = {}
