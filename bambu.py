@@ -59,34 +59,48 @@ class BambuCloud:
 
     # ── Auth ──────────────────────────────────────────────────────────────────
 
-    def login(self) -> bool:
-        """Login to Bambu cloud and get access token + uid."""
+    def login(self) -> tuple[bool, str]:
+        """Login to Bambu cloud. Returns (success, error_message)."""
         try:
             r = requests.post(AUTH_URL, json={
                 "account": self.email,
                 "password": self.password,
                 "apiError": ""
-            }, timeout=10)
+            }, timeout=15)
+            print(f"Auth response: {r.status_code} — {r.text[:300]}")
+
+            if r.status_code != 200:
+                return False, f"Auth HTTP {r.status_code}: {r.text[:200]}"
+
             data = r.json()
-            self.token = data.get("accessToken")
+
+            # Bambu sometimes returns loginType=verifyCode (needs 2FA)
+            if data.get("loginType") == "verifyCode":
+                return False, "Bambu richiede verifica email (2FA) — disabilita 2FA su bambulab.com"
+
+            self.token = data.get("accessToken") or data.get("token")
             if not self.token:
-                return False
+                return False, f"Token non trovato nella risposta: {list(data.keys())}"
 
             r2 = requests.get(PROFILE_URL, headers={
                 "Authorization": f"Bearer {self.token}"
             }, timeout=10)
+            print(f"Profile response: {r2.status_code} — {r2.text[:200]}")
             profile = r2.json()
             self.uid = str(profile.get("uid", ""))
-            return bool(self.uid)
+            if not self.uid:
+                return False, f"UID non trovato nel profilo: {list(profile.keys())}"
+            return True, "ok"
         except Exception as e:
-            print(f"Login error: {e}")
-            return False
+            return False, str(e)
 
     # ── MQTT ──────────────────────────────────────────────────────────────────
 
     def connect_mqtt(self) -> bool:
         if not self.token or not self.uid:
-            if not self.login():
+            ok, err = self.login()
+            if not ok:
+                print(f"MQTT login failed: {err}")
                 return False
 
         client = mqtt.Client(client_id=f"printqueue_{self.uid}", protocol=mqtt.MQTTv311)

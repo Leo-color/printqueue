@@ -54,12 +54,13 @@ def auto_connect():
         return
     try:
         p = BambuCloud(email, password, serial)
-        if p.login():
+        ok, err = p.login()
+        if ok:
             p.connect_mqtt()
             printer = p
             log("Connesso automaticamente al cloud Bambu")
         else:
-            log("Auto-connessione fallita — controlla le variabili d'ambiente")
+            log(f"Auto-connessione fallita: {err}")
     except Exception as e:
         log(f"Auto-connessione errore: {e}")
 PLATE_Y = 256.0
@@ -182,9 +183,9 @@ def connect():
         return jsonify({"ok": False, "error": "Email, password e serial richiesti"}), 400
     try:
         p = BambuCloud(email, password, serial)
-        ok = p.login()
+        ok, err = p.login()
         if not ok:
-            return jsonify({"ok": False, "error": "Login fallito — controlla email e password Bambu"})
+            return jsonify({"ok": False, "error": f"Login fallito: {err}"})
         p.connect_mqtt()
         printer = p
         log(f"Connesso al cloud Bambu — serial: {serial}")
