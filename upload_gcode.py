@@ -30,8 +30,6 @@ for p in PRUSA_PATHS:
 def slice_file(stl_path: str, layer_h=0.2, infill=15, supports="none", color="#FF8000") -> str:
     """Slice con il tuo PrusaSlicer locale. Ritorna path a .gcode generato."""
     stl_path = Path(stl_path).resolve()
-    if not stl_path.exists():
-        raise FileNotFoundError(f"File non trovato: {stl_path}")
 
     if not PRUSA_PATH:
         print("ERRORE: PrusaSlicer non trovato!")
@@ -112,15 +110,30 @@ def upload_to_render(gcode_path: str):
     print(f"✓ Uploaded: {gcode_path.name}")
     print(f"✓ In coda su {RENDER_URL}")
 
+def find_file(filename: str) -> str:
+    """Cerca il file sul disco. Se non esiste nel percorso relativo, lo cerca su tutto C:."""
+    p = Path(filename)
+    if p.exists():
+        return str(p.resolve())
+
+    # Cerca ricorsivamente da C:\Users\Utente
+    print(f"Cerco {filename} sul computer...")
+    for found in Path(r"C:\Users\Utente").rglob(filename):
+        print(f"✓ Trovato: {found}")
+        return str(found)
+
+    raise FileNotFoundError(f"File non trovato: {filename}")
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Uso: python upload_gcode.py <file.stl|obj|3mf> [layer_mm] [infill_%] [supporti]")
         print("Esempi:")
-        print("  python upload_gcode.py mio_oggetto.stl")
-        print("  python upload_gcode.py mio_oggetto.stl 0.1 20 tree")
+        print("  python upload_gcode.py Vortex_Ball_Fidget.stl")
+        print("  python upload_gcode.py Vortex_Ball_Fidget.stl 0.1 20 tree")
         sys.exit(1)
 
-    stl_file = sys.argv[1]
+    filename = sys.argv[1]
+    stl_file = find_file(filename)
     layer_h = float(sys.argv[2]) if len(sys.argv) > 2 else 0.2
     infill = int(sys.argv[3]) if len(sys.argv) > 3 else 15
     supports = sys.argv[4] if len(sys.argv) > 4 else "none"
