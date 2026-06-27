@@ -13,7 +13,6 @@ from functools import wraps
 from flask import Flask, request, jsonify, render_template_string, send_from_directory, session, redirect, url_for
 from dotenv import load_dotenv
 from bambu import BambuCloud
-from slicer import slice_stl, prusaslicer_available
 
 load_dotenv()
 
@@ -327,60 +326,21 @@ def get_ams():
     return jsonify({"ok": True, "slots": slots})
 
 
-@app.route("/api/slice", methods=["POST"])
+@app.route("/api/upload", methods=["POST"])
 @login_required
-def slice_file():
-    """Slice an STL file and add the resulting gcode to the queue."""
+def upload_gcode_file():
+    """Upload .gcode file generated locally with upload_gcode.py tool."""
     if "file" not in request.files:
         return jsonify({"ok": False, "error": "Nessun file"}), 400
     f = request.files["file"]
-    ALLOWED = (".stl", ".obj", ".3mf")
-    if not any(f.filename.lower().endswith(e) for e in ALLOWED):
-        return jsonify({"ok": False, "error": "Formati supportati: STL, OBJ, 3MF"}), 400
+    if not f.filename.endswith(".gcode"):
+        return jsonify({"ok": False, "error": "Serve un file .gcode"}), 400
 
-    # Save STL
-    stl_path = UPLOAD_FOLDER / f.filename
-    f.save(str(stl_path))
-
-    # Slicing settings from form
-    layer_height = float(request.form.get("layer_height", 0.2))
-    infill = int(request.form.get("infill", 15))
-    supports = request.form.get("supports", "none")
-    filament_color = request.form.get("color", "#FF8000")
-
-    log(f"Slicing: {f.filename} | layer={layer_height}mm | infill={infill}% | supporti={supports}")
-
-    # Add to queue as "slicing" status immediately
-    job = {"name": f.filename, "path": str(stl_path), "status": "slicing", "type": "stl"}
-    queue.append(job)
-
-    # Run slicing in background thread
-    def do_slice():
-        ok, gcode_path, msg = slice_stl(
-            str(stl_path), str(UPLOAD_FOLDER),
-            layer_height=layer_height,
-            infill=infill,
-            supports=supports,
-            filament_color=filament_color,
-        )
-        if ok:
-            job["path"] = gcode_path
-            job["name"] = Path(gcode_path).name
-            job["status"] = "queued"
-            job["type"] = "gcode"
-            log(f"Slicing completato: {job['name']}")
-        else:
-            job["status"] = "error"
-            log(f"Slicing fallito: {msg}")
-
-    threading.Thread(target=do_slice, daemon=True).start()
-    return jsonify({"ok": True, "message": "Slicing avviato (~3-5 min)"})
-
-
-@app.route("/api/slicer_status")
-@login_required
-def slicer_status():
-    return jsonify({"available": prusaslicer_available()})
+    dest = UPLOAD_FOLDER / f.filename
+    f.save(str(dest))
+    queue.append({"name": f.filename, "path": str(dest), "status": "queued"})
+    log(f"Upload: {f.filename}")
+    return jsonify({"ok": True})
 
 
 # ── HTML ──────────────────────────────────────────────────────────────────────
@@ -484,45 +444,16 @@ button{width:100%;margin-top:8px;padding:8px;border:none;border-radius:7px;font-
   </div>
 </div>
 <div>
-  <!-- Upload tabs -->
+  <!-- Upload gcode -->
   <div class="card">
     <h2>Aggiungi alla Coda</h2>
-    <!-- Solo STL/OBJ/3MF -->
-    <div id="panel-stl">
-      <div class="dz" id="dz-stl" onclick="document.getElementById('fi-stl').click()">
-        <p>Trascina file STL, OBJ o 3MF qui<br>oppure clicca per scegliere</p>
-        <input id="fi-stl" type="file" accept=".stl,.obj,.3mf" onchange="selectStl(this.files[0])">
-      </div>
-      <div id="stl-settings" style="display:none;margin-top:10px">
-        <div style="font-size:.78rem;color:#aaa;margin-bottom:8px" id="stl-name"></div>
-
-        <!-- Filament color from AMS -->
-        <label>Colore filamento (da AMS)</label>
-        <div id="ams-slots" style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px"></div>
-
-        <label>Altezza layer</label>
-        <select id="sl-layer" style="width:100%;background:#111;border:1px solid #2e2e2e;border-radius:6px;padding:7px;color:#ddd;font-size:.82rem;margin-bottom:8px">
-          <option value="0.1">0.1mm (Fine)</option>
-          <option value="0.2" selected>0.2mm (Standard)</option>
-          <option value="0.3">0.3mm (Veloce)</option>
-        </select>
-
-        <label>Riempimento</label>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-          <input type="range" id="sl-infill" min="5" max="100" value="15" style="flex:1" oninput="document.getElementById('infill-val').textContent=this.value+'%'">
-          <span id="infill-val" style="font-size:.8rem;color:#aaa;width:35px">15%</span>
-        </div>
-
-        <label>Supporti</label>
-        <select id="sl-supports" style="width:100%;background:#111;border:1px solid #2e2e2e;border-radius:6px;padding:7px;color:#ddd;font-size:.82rem;margin-bottom:12px">
-          <option value="none">Nessuno</option>
-          <option value="normal">Normali</option>
-          <option value="tree">Albero (Tree)</option>
-        </select>
-
-        <button class="p" onclick="sliceAndQueue()" id="slice-btn">Slicia e aggiungi</button>
-        <div id="slice-msg" style="font-size:.72rem;color:#f59e0b;margin-top:6px;display:none">Slicing in corso (~3-5 min)...</div>
-      </div>
+    <p style="font-size:.78rem;color:#aaa;margin-bottom:12px">
+      📄 <strong>Carica file .gcode</strong> generati con <code>upload_gcode.py</code> sul tuo PC<br>
+      STL/OBJ/3MF si sliciano localmente, poi si uploadano qui.
+    </p>
+    <div class="dz" id="dz" onclick="document.getElementById('fi').click()">
+      <p>Trascina file .gcode qui<br>oppure clicca per scegliere</p>
+      <input id="fi" type="file" accept=".gcode" multiple onchange="uploadGcode(this.files)">
     </div>
 
     <div id="ql" style="margin-top:10px"></div>
@@ -538,12 +469,21 @@ button{width:100%;margin-top:8px;padding:8px;border:none;border-radius:7px;font-
 </div>
 </div>
 <script>
-const dzs=document.getElementById('dz-stl');
-dzs.addEventListener('dragover',e=>{e.preventDefault();dzs.classList.add('ov')});
-dzs.addEventListener('dragleave',()=>dzs.classList.remove('ov'));
-dzs.addEventListener('drop',e=>{e.preventDefault();dzs.classList.remove('ov');selectStl(e.dataTransfer.files[0])});
+const dz=document.getElementById('dz');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('ov')});
+dz.addEventListener('dragleave',()=>dz.classList.remove('ov'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('ov');uploadGcode(e.dataTransfer.files)});
 
 async function post(url,body){return fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json())}
+
+async function uploadGcode(files){
+  const fd=new FormData();
+  for(const f of files)if(f.name.endsWith('.gcode'))fd.append('file',f);
+  const r=await fetch('/api/upload',{method:'POST',body:fd});
+  const d=await r.json();
+  if(!d.ok)alert(d.error);
+  refresh();
+}
 async function startAuto(){const d=await post('/api/start',{});if(!d.ok)alert(d.error);else refresh()}
 async function stopAuto(){await post('/api/stop',{});refresh()}
 async function saveCool(){await post('/api/cooldown',{seconds:parseInt(document.getElementById('cool').value)})}
