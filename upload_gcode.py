@@ -13,8 +13,19 @@ from pathlib import Path
 RENDER_URL = "https://printqueue-yjfk.onrender.com"
 SITE_PASSWORD = "Leonardo Carlo Manzone"
 
-# Percorso a PrusaSlicer installato con Bambu Studio
-PRUSA_PATH = r"C:\Program Files\Bambu Studio\prusa-slicer.exe"
+# Percorso a PrusaSlicer — prova Bambu Studio prima, poi standalone
+PRUSA_PATHS = [
+    r"C:\Program Files\Bambu Studio\prusa-slicer.exe",
+    r"C:\Program Files\Bambu Lab\Bambu Studio\prusa-slicer.exe",
+    r"C:\Users\Utente\AppData\Local\Bambu Studio\prusa-slicer.exe",
+    r"C:\Program Files\PrusaSlicer\prusa-slicer.exe",
+]
+
+PRUSA_PATH = None
+for p in PRUSA_PATHS:
+    if Path(p).exists():
+        PRUSA_PATH = p
+        break
 
 def slice_file(stl_path: str, layer_h=0.2, infill=15, supports="none", color="#FF8000") -> str:
     """Slice con il tuo PrusaSlicer locale. Ritorna path a .gcode generato."""
@@ -22,9 +33,14 @@ def slice_file(stl_path: str, layer_h=0.2, infill=15, supports="none", color="#F
     if not stl_path.exists():
         raise FileNotFoundError(f"File non trovato: {stl_path}")
 
-    if not Path(PRUSA_PATH).exists():
-        print(f"ERRORE: PrusaSlicer non trovato in {PRUSA_PATH}")
-        print("Controlla che Bambu Studio sia installato correttamente.")
+    if not PRUSA_PATH:
+        print("ERRORE: PrusaSlicer non trovato!")
+        print("\nSoluzioni:")
+        print("1. Installa Bambu Studio (lo contiene): https://www.bambulab.com/en/download/studio")
+        print("2. O installa PrusaSlicer standalone: https://www.prusa3d.com/en/product/prusaslicer-3/")
+        print("\nPercorsi cercati:")
+        for p in PRUSA_PATHS:
+            print(f"  - {p}")
         sys.exit(1)
 
     out_gcode = stl_path.parent / (stl_path.stem + "_printqueue.gcode")
