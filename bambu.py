@@ -21,26 +21,25 @@ MQTT_TOPIC_REPORT = "device/{serial}/report"
 MQTT_TOPIC_REQUEST = "device/{serial}/request"
 
 # G-code injected at end of every print to eject the piece
-# SAFE SEQUENCE — NO DAMAGE TO PLATE!
 # Sequence:
 #   1. Wait cooldown (cooling)
-#   2. RAISE Z HIGH (30mm) — well above plate
-#   3. Move nozzle to SIDE of plate (X=10, Y=center)
-#   4. Lower nozzle gently to piece
-#   5. PUSH SLOWLY toward opposite side (gentle, no force)
-#   6. Home safely
-EJECT_GCODE = """; === AUTO EJECT SEQUENCE (SAFE) ===
-M400                    ; wait all moves
-M104 S0                 ; nozzle off
-M140 S0                 ; bed off
-G4 P{cooldown_ms}       ; cooldown
-G28 Z                   ; home Z (safe position)
-G1 Z30 F1200            ; raise WELL ABOVE plate (30mm safety margin)
-G1 X20 Y{center_y} F6000 ; move to LEFT side
-G1 Z{push_z} F300       ; lower gently to piece (slow)
-G1 X240 F400            ; push SLOWLY to right (gentle push)
-G1 Z25 F600             ; raise quickly
-G28 X Y Z               ; home all (safe finish)
+#   2. Raise Z above piece
+#   3. Move nozzle center-back of plate
+#   4. Lower nozzle just below piece top
+#   5. Slowly push piece toward front edge (falls off)
+#   6. Home
+EJECT_GCODE = """; === AUTO EJECT SEQUENCE ===
+M400
+M104 S0
+M140 S0
+G4 P{cooldown_ms}
+G28 Z
+G1 Z15 F600
+G1 X{center_x} Y{back_y} F6000
+G1 Z{push_z} F300
+G1 Y{front_y} F300
+G1 Y{back_y} F6000
+G28 X Y
 ; === END EJECT ===
 """
 
@@ -187,14 +186,18 @@ class BambuCloud:
     ) -> str:
         from pathlib import Path
 
-        center_y = plate_y_mm / 2
-        push_z = max(piece_height_mm - 1.5, 1)  # Slightly above piece
+        center_x = plate_x_mm / 2
+        back_y = plate_y_mm - 2
+        front_y = 2
+        push_z = max(piece_height_mm - 2, 1)
         cooldown_ms = cooldown_seconds * 1000
 
         eject = EJECT_GCODE.format(
             cooldown_ms=int(cooldown_ms),
-            center_y=center_y,
+            center_x=center_x,
+            back_y=back_y,
             push_z=push_z,
+            front_y=front_y,
         )
 
         path = Path(gcode_path)
