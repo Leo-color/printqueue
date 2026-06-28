@@ -326,21 +326,6 @@ def get_ams():
     return jsonify({"ok": True, "slots": slots})
 
 
-@app.route("/api/upload", methods=["POST"])
-@login_required
-def upload_gcode_file():
-    """Upload .gcode file generated locally with upload_gcode.py tool."""
-    if "file" not in request.files:
-        return jsonify({"ok": False, "error": "Nessun file"}), 400
-    f = request.files["file"]
-    if not f.filename.endswith(".gcode"):
-        return jsonify({"ok": False, "error": "Serve un file .gcode"}), 400
-
-    dest = UPLOAD_FOLDER / f.filename
-    f.save(str(dest))
-    queue.append({"name": f.filename, "path": str(dest), "status": "queued"})
-    log(f"Upload: {f.filename}")
-    return jsonify({"ok": True})
 
 
 # ── HTML ──────────────────────────────────────────────────────────────────────
