@@ -224,7 +224,11 @@ def status():
 @app.route("/api/upload", methods=["POST"])
 @login_required
 def upload():
-    files = request.files.getlist("files")
+    # Accetta sia 'file' che 'files' per compatibilità
+    files = request.files.getlist("file") or request.files.getlist("files")
+    if not files:
+        return jsonify({"ok": False, "error": "Nessun file"}), 400
+
     added = []
     for f in files:
         if not f.filename.endswith(".gcode"):
@@ -234,6 +238,7 @@ def upload():
         queue.append({"name": f.filename, "path": str(dest), "status": "queued"})
         added.append(f.filename)
         log(f"Aggiunto: {f.filename}")
+
     return jsonify({"ok": True, "added": added})
 
 @app.route("/api/remove", methods=["POST"])
