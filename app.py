@@ -367,23 +367,33 @@ def manual_eject():
 def get_ams():
     """Return ONLY actual AMS filament slots from printer cloud."""
     if not printer:
+        log("AMS: No printer connection")
         return jsonify({"ok": False, "slots": []})
+
     st = printer.get_status()
+    log(f"AMS status data keys: {list(st.keys())}")
+
     slots = []
     ams_data = st.get("ams", {})
+    log(f"AMS data type: {type(ams_data)}, content: {ams_data}")
 
     # Read ONLY actual filaments from AMS (via cloud MQTT)
     if isinstance(ams_data, dict):
         ams_list = ams_data.get("ams", [])
+        log(f"AMS list: {ams_list}")
         for ams_unit in ams_list:
             for tray in ams_unit.get("tray", []):
-                slots.append({
+                color_hex = "#" + tray.get("tray_color", "FFFFFF")[:6]
+                slot = {
                     "id": tray.get("id", ""),
-                    "color": "#" + tray.get("tray_color", "FFFFFF")[:6],
+                    "color": color_hex,
                     "material": tray.get("tray_type", "PLA"),
                     "name": tray.get("tray_sub_brands", tray.get("tray_type", "PLA")),
-                })
+                }
+                slots.append(slot)
+                log(f"Added color: {slot}")
 
+    log(f"Total slots found: {len(slots)}")
     return jsonify({"ok": True, "slots": slots})
 
 
