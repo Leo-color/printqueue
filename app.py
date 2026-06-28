@@ -531,11 +531,6 @@ button{width:100%;margin-top:8px;padding:8px;border:none;border-radius:7px;font-
 </div>
 </div>
 <script>
-const dz=document.getElementById('dz');
-dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('ov')});
-dz.addEventListener('dragleave',()=>dz.classList.remove('ov'));
-dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('ov');uploadGcode(e.dataTransfer.files)});
-
 async function post(url,body){return fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json())}
 
 async function uploadGcodeFiles(files){
