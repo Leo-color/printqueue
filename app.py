@@ -482,8 +482,19 @@ button{width:100%;margin-top:8px;padding:8px;border:none;border-radius:7px;font-
     </div>
 
     <div id="ql" style="margin-top:10px"></div>
+
+    <!-- Selezione colore -->
+    <div id="color-panel" style="display:none;margin-top:14px;padding:12px;background:#111;border-radius:7px;border:1px solid #222">
+      <label style="display:block;margin-bottom:8px;font-size:.75rem;color:#777">Colore filamento:</label>
+      <div id="ams-slots" style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap"></div>
+      <div class="row" style="margin-top:0;gap:8px">
+        <button class="g" onclick="startPrintWithColor()">✓ Stampa</button>
+        <button class="q" onclick="cancelPrint()">Annulla</button>
+      </div>
+    </div>
+
     <div class="row" style="margin-top:10px">
-      <button class="g" onclick="startAuto()">▶ Avvia</button>
+      <button class="g" id="print-btn" onclick="showColorSelector()">▶ Stampa</button>
       <button class="r" onclick="stopAuto()">■ Stop</button>
     </div>
   </div>
@@ -590,6 +601,47 @@ async function refresh(){
   lb.scrollTop=lb.scrollHeight;
   document.getElementById('cool').value=d.cooldown;
 }
+
+// ── Selezione colore ──
+let selectedPrintColor = '#FF8000';
+
+async function showColorSelector(){
+  const q=document.getElementById('ql');
+  if(!q.innerText.includes('gcode')){
+    alert('Carica un file .gcode prima!');
+    return;
+  }
+  // Carica colori disponibili
+  const r=await fetch('/api/ams').then(r=>r.json());
+  const slots=document.getElementById('ams-slots');
+  slots.innerHTML='';
+  for(const s of r.slots){
+    const btn=document.createElement('div');
+    btn.style.cssText=`width:40px;height:40px;border-radius:50%;background:${s.color};cursor:pointer;border:3px solid transparent;transition:.15s`;
+    btn.title=s.material+' — '+s.name;
+    btn.onclick=()=>{
+      document.querySelectorAll('#ams-slots div').forEach(b=>b.style.borderColor='transparent');
+      btn.style.borderColor='#fff';
+      selectedPrintColor=s.color;
+    };
+    if(!slots.children.length){btn.style.borderColor='#fff';selectedPrintColor=s.color;}
+    slots.appendChild(btn);
+  }
+  document.getElementById('color-panel').style.display='';
+  document.getElementById('print-btn').disabled=true;
+}
+
+function cancelPrint(){
+  document.getElementById('color-panel').style.display='none';
+  document.getElementById('print-btn').disabled=false;
+}
+
+async function startPrintWithColor(){
+  cancelPrint();
+  // Avvia la stampa con il colore selezionato
+  await startAuto();
+}
+
 setInterval(refresh,5000);
 refresh();
 </script>
