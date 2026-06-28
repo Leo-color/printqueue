@@ -1,359 +1,347 @@
-# 🆘 TROUBLESHOOTING — Print Queue
+# Troubleshooting — Print Queue Automation
 
-Soluzioni rapide ai problemi comuni.
+Common issues and solutions.
 
 ---
 
-## 🔴 Stampante Non Connessa
+## Printer Not Connected
 
-### Sintomo:
+**Symptom:**
 ```
-[❌] Non connesso
+Status: Not Connected
 ```
 
-### Cause & Soluzioni:
+**Causes and Solutions:**
 
-**1. Token scaduto**
+### Token Expired
+
 ```bash
-python get_token.py        # Ottieni nuovo token
-# Aggiorna .env
-# Se su Render: aggiorna environment variables
-# git push origin main     # Rideploy
+python get_token.py        # Obtain new token
 ```
 
-**2. Serial stampante sbagliato**
-```
-Stampante A1 → Menu Impostazioni → Info Sistema → Serial
-# Copia esattamente (con M iniziale)
-# Aggiorna .env: BAMBU_SERIAL=Mxxxxxxxx
+Update in `.env` and Render environment variables, then redeploy:
+```bash
+git push origin main
 ```
 
-**3. Render environment variables non salvate**
+### Serial Number Incorrect
+
+Verify printer serial:
 ```
-Render dashboard → Service → Environment
-Verifica che BAMBU_TOKEN, BAMBU_UID, BAMBU_SERIAL siano salvati
-Se modificati: click "Redeploy latest commit"
+Bambu Lab A1 → Menu → Settings → System Information
 ```
 
-**4. WiFi A1 disconnessa**
-```
-Stampante A1 → Menu WiFi → Verifica connessione
-Riavvia A1 se necessario
+Update `BAMBU_SERIAL=M...` in both `.env` and Render environment.
+
+Redeploy:
+```bash
+git push origin main
 ```
 
----
+### Environment Variables Not Saved
 
-## 📤 Upload File Fallisce
+In Render dashboard:
+- Check that all environment variables are present
+- Click "Redeploy latest commit"
+- Wait 2-3 minutes
 
-### Sintomo:
-```
-ERROR: Upload fallito
-```
+### Printer Offline
 
-### Cause & Soluzioni:
-
-**1. File non è .gcode**
 ```
-Nome file deve finire con: .gcode
-Non: .gcode.bak, .txt, .stl
-```
-
-**2. File troppo grande**
-```
-Max size: 100MB
-Se > 100MB: dividi stampa in più file
-```
-
-**3. Server Render down**
-```
-Visita: https://status.render.com
-Se down: attendi ripristino
-Altrimenti: git push origin main (rideploy)
-```
-
-**4. Password login sbagliata**
-```
-Password corretta: Leonardo Carlo Manzone
-Se "Password errata": controlla SECRET_KEY in .env
-Su Render: controlla environment variable SECRET_KEY
+Bambu Lab A1 → Check WiFi connection
+Restart printer if needed
 ```
 
 ---
 
-## ▶️ Stampa Non Parte
+## Upload File Fails
 
-### Sintomo:
+**Symptom:**
 ```
-[Status] printing: 0%
-[Log] Avvio stampa... (bloccato)
-```
-
-### Cause & Soluzioni:
-
-**1. Stampante offline**
-```
-Sezione "Stampante" nel sito:
-- Verde 🟢 = Online (OK)
-- Rosso 🔴 = Offline (Problema)
-
-Soluzione:
-- Riavvia A1
-- Controlla WiFi A1
-- Controlla token Bambu (vedi "Stampante Non Connessa")
+ERROR: Upload failed
 ```
 
-**2. Nessun file in coda**
-```
-Sezione "Aggiungi alla Coda":
-Se "Nessun file in coda":
-→ Carica un file .gcode prima di cliccare "▶ Stampa"
-```
+**Causes and Solutions:**
 
-**3. File corrotto**
-```
-Nel Log vedi: ERROR: File not found / corrupted
-Soluzione:
-- Ricarica il file .gcode
-- Rigenera il file con PrusaSlicer
-- Controlla che file non sia vuoto
-```
+### Wrong File Format
 
-**4. API non risponde**
-```
-Refresh il sito: F5 oppure Ctrl+R
-Se ancora bloccato:
-- Clicca "■ Stop"
-- Attendi 5 secondi
-- Riprova "▶ Stampa"
+File must end with `.gcode`
+
+Acceptable:
+- `part.gcode` ✓
+- `part_printqueue.gcode` ✓
+
+Not acceptable:
+- `part.gcode.bak` ✗
+- `part.stl` ✗
+
+### File Too Large
+
+Maximum size: 100 MB
+
+**Solution:** Split print into multiple files using PrusaSlicer.
+
+### Password Incorrect
+
+Password: `Leonardo Carlo Manzone`
+
+Verify `SECRET_KEY` matches in `.env` and Render environment.
+
+### Server Unavailable
+
+Check Render dashboard. If showing errors, redeploy:
+```bash
+git push origin main
 ```
 
 ---
 
-## 🎯 Pezzo Non Cade
+## Print Won't Start
 
-### Sintomo:
+**Symptom:**
 ```
-[Log] Espulsione completata.
-[Reality] Pezzo ancora sul piatto 😢
-```
-
-### Cause & Soluzioni:
-
-**1. Cooldown insufficiente**
-```
-Pezzo non si ritrae abbastanza dal piatto.
-Soluzione:
-- Aumenta "Raffreddamento (secondi)" a 600 o più
-- Clicca "Salva"
-- Stampa di nuovo
+Status: printing (0%)
+Log: "Starting print..." (stuck)
 ```
 
-**2. Pezzo incollato al PEI**
-```
-Il piatto PEI è invecchiato/sporco.
-Soluzione:
-- Pulisci PEI con alcol isopropilico
-- Inspira aria calda (60°C piatto)
-- Riprova eiezione manuale
-```
+**Causes and Solutions:**
 
-**3. Altezza pezzo non rilevata**
-```
-Sistema non riesce a capire quanto è alto il pezzo.
-Nel Log vedi: "Piece height: 5.0mm" (default)
-Soluzione:
-- Se pezzo è molto grande: aggiungi manualmente nel gcode
-- G-code deve avere linee Z per rilevare altezza
-```
+### Printer Offline
 
-**4. Nozzle ostruito**
-```
-L'ugello non scende/sale bene.
-Soluzione:
-- Clicca "Test espulsione manuale" nel sito
-- Se stesso problema: pulisci nozzle
-- Controlla no gunk on hotend
-```
+In web interface:
+- Check Printer section indicator
+- If red: see "Printer Not Connected" section above
+
+### No File in Queue
+
+Before clicking Print:
+- Upload a `.gcode` file
+- Verify it appears in the queue
+
+### Corrupted File
+
+**Symptoms:** File doesn't show in queue, or shows error in Log
+
+**Solution:** Re-upload or regenerate the file with PrusaSlicer
+
+### API Not Responding
+
+1. Refresh page (F5 or Ctrl+R)
+2. Click "Stop"
+3. Wait 5 seconds
+4. Try again
 
 ---
 
-## 🔊 Errori nel Log
+## Piece Won't Fall
 
-### `ERROR: Save error: Permission denied`
+**Symptom:**
+```
+Log: "Ejection complete"
+Reality: Piece still on plate
+```
 
-**Causa:** Cartella `uploads/` non ha permessi di scrittura
+**Causes and Solutions:**
 
-**Soluzione (locale):**
+### Insufficient Cooldown
+
+The piece may not have cooled enough.
+
+**Solution:**
+1. In web interface, Settings section, increase "Cooldown (seconds)"
+2. Try 600 seconds (10 minutes) for larger pieces
+3. Click Save
+4. Try again with next print
+
+### PEI Plate Issues
+
+PEI surface may be dirty or aged.
+
+**Solution:**
+1. Clean PEI plate with isopropyl alcohol
+2. Warm plate to 60°C to release piece
+3. Click "Test Manual Ejection" in Settings
+4. If still stuck: remove piece manually
+
+### Piece Too Large or Complex
+
+Large pieces may not fall completely.
+
+**Solution:**
+1. Click "Test Manual Ejection" to retry
+2. If piece still stuck: increase cooldown time
+3. Remove manually if necessary
+
+### Nozzle Issue
+
+Nozzle may not be moving correctly.
+
+**Solution:**
+1. Check hotend for debris
+2. Click "Test Manual Ejection"
+3. If issue persists: check printer mechanics
+
+---
+
+## Errors in Log
+
+### "ERROR: Save error: Permission denied"
+
+**Cause:** Upload directory permissions issue
+
+**Solution (Local):**
 ```bash
 chmod -R 755 uploads/
 ```
 
-**Soluzione (Render):** Già configurato, rideploy:
+**Solution (Render):** Already configured. Redeploy:
 ```bash
 git push origin main
 ```
 
----
+### "ERROR: Eject gcode: File not found"
 
-### `ERROR: Eject gcode: File not found`
+**Cause:** File not saved correctly
 
-**Causa:** File gcode non salvato correttamente
-
-**Soluzione:**
+**Solution:**
 ```bash
-# Verifica che file esista:
-ls uploads/         # Deve elencare i tuoi file
-# Se vuoto: carica di nuovo il file
+# Local testing
+ls uploads/     # Should list your files
+
+# If empty: re-upload the file
 ```
 
----
+### "ERROR: MQTT connection failed"
 
-### `ERROR: MQTT connection failed`
+**Cause:** Token expired or Bambu Cloud unreachable
 
-**Causa:** Token scaduto o cloud Bambu down
-
-**Soluzione:**
+**Solution:**
 ```bash
-python get_token.py     # Nuovo token
-# Aggiorna in .env e Render
+python get_token.py     # Get new token
+# Update .env and Render environment
 git push origin main
 ```
 
----
+### "ERROR: Cooldown out of range"
 
-### `ERROR: Cooldown not in range 30-3600`
+**Cause:** Invalid cooldown value
 
-**Causa:** Hai inserito un valore fuori range
-
-**Soluzione:**
+**Solution:**
 ```
-Nel sito, sezione "Impostazioni":
-Raffreddamento: deve essere tra 30 e 3600 secondi
-Esempi validi:
-- 30 (mezzo minuto)
-- 300 (5 minuti — default)
-- 600 (10 minuti)
-- 3600 (1 ora max)
+Valid range: 30 to 3600 seconds
+30 = 30 seconds (minimum)
+300 = 5 minutes (default)
+3600 = 1 hour (maximum)
 ```
 
 ---
 
-## 🌐 Problemi Render
+## Render Deployment Issues
 
-### Deploy fails: `Build command failed`
+### Build Fails
+
+Check Render dashboard Logs for specific error.
+
+**Common causes:**
+- Missing Python dependencies
+- Syntax error in code
+- Invalid environment variable
+
+**Solution:**
+```bash
+# Fix the issue locally
+git push origin main    # Retry build
+```
+
+### Service Runs but Doesn't Respond
+
+1. Visit Render dashboard → Logs
+2. Check for Python errors
+3. Click "Restart Service"
+4. Wait 2 minutes
+5. Try again
+
+### Port Already in Use (Local)
 
 ```bash
-# Verifica dipendenze:
-pip install -r requirements.txt
-
-# Controlla build.sh sintassi:
-cat build.sh     # Deve essere valido bash
-
-# Ripush:
-git push origin main
-```
-
----
-
-### Deploy succeeds pero sito non risponde
-
-```
-Render dashboard → Logs
-Vedi errore Python?
-Se sì: correggi app.py e ripush
-
-Se no errore visibile:
-- Riavvia servizio: Render dashboard → "Restart"
-- Attendi 2 minuti
-- Riprova https://printqueue-yjfk.onrender.com
-```
-
----
-
-### "Port already in use" (locale)
-
-```bash
-# Se app.py dice: Port 5000 already in use
-
-# Uccidi il processo:
+# If running locally and get "port 5000 in use"
 lsof -ti:5000 | xargs kill -9
 
-# Oppure usa porta diversa:
+# Or use different port
 python app.py --port 5001
-# Accedi: http://localhost:5001
+# Access: http://localhost:5001
 ```
 
 ---
 
-## 🖥️ Test Locale vs Cloud
+## Testing
 
-### Test Locale (offline, no cloud):
+### Test Locally (Offline)
 
 ```bash
-cd printqueue
 python app.py
-# Accedi: http://localhost:5000
-# Funziona senza internet? ❌ (serve cloud Bambu)
+# Access: http://localhost:5000
+# Works without internet? No (requires Bambu Cloud)
 ```
 
-### Test Cloud (su Render):
+### Test on Cloud (via Render)
 
 ```
 https://printqueue-yjfk.onrender.com
-Funziona da celluare su 4G? ✅ (connessione cloud OK)
+# Works on mobile 4G? Yes (Bambu Cloud connection)
 ```
+
+### Manual Ejection Test
+
+In Settings section:
+- Click "Test Manual Ejection"
+- Runs ejection sequence without printing
+- Useful for debugging
 
 ---
 
-## 📊 Debug Avanzato
+## Debug Mode
 
-### Abilita Flask debug mode:
+### Enable Flask Debug
 
 ```bash
 export FLASK_DEBUG=1
 python app.py
+# More detailed errors and hot-reload
 ```
 
-Vedi errori dettagliati e hot-reload.
+### View HTTP Requests
 
----
+In browser:
+1. Press F12 (Developer Tools)
+2. Click Network tab
+3. Upload file
+4. Check requests for errors
 
-### Vedi request/response HTTP:
+### View Render Logs Live
 
-```bash
-# Nel browser, premi F12 → Network
-# Carica file
-# Guarda le richieste:
-POST /api/upload → Status 200 OK? ✅
 ```
-
----
-
-### Controlla log Render live:
-
-```bash
-# Render dashboard → Service → Logs
-# Vedi tutto quello che succede sul server
-# Cercaparte: grep "ERROR" per errori
+Render dashboard → Service → Logs
+Shows everything happening on server
+Search for "ERROR" to find issues
 ```
 
 ---
 
-## ☎️ Quando Contattare Support
+## When to Contact Support
 
-Se ancora non funziona:
+Before reaching out:
+1. Read [README.md](README.md)
+2. Read [SETUP.md](SETUP.md)
+3. Check this document
+4. Look at Log in web interface
+5. Try "Test Manual Ejection"
 
-1. ✅ Leggi questo documento
-2. ✅ Controlla [README.md](README.md)
-3. ✅ Leggi [SETUP.md](SETUP.md)
-4. ✅ Guarda il Log nel sito per indizi
-5. ✅ Prova "Test espulsione manuale"
-
-Se ancora bloccato, puoi:
-- Aprire una issue su GitHub
-- Descrivere il Log esatto che vedi
-- Includere screenshot
+If still stuck:
+- Check Render logs for specific error message
+- Include the exact error from the Log
+- Include screenshot if helpful
 
 ---
 
-**Buona stampa! 🖨️✨**
+*Troubleshooting Guide v1.0 — June 2026*

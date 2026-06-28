@@ -1,311 +1,274 @@
-# 🖨️ Print Queue Automation — Bambu Lab A1
+# Print Queue Automation for Bambu Lab A1
 
-Sistema automatico di stampa continua con **eiezione automatica** per Bambu Lab A1. Accedi da **qualsiasi luogo** tramite cloud Bambu.
+An automated continuous printing system with automatic piece ejection for Bambu Lab A1. Access and control your printer from anywhere using Bambu Cloud.
 
----
+## Key Features
 
-## 🚀 Funzionalità
-
-✅ **Coda stampa automatica** — Carica file `.gcode`, il sistema stampa uno per uno  
-✅ **Eiezione automatica** — Il pezzo cade dal piatto dopo il print (nessun intervento manuale)  
-✅ **Selezione colore** — Scegli il filamento prima di stampare  
-✅ **Stampa continua** — Loop automatico finché non finiscono i file  
-✅ **Controllo da web** — Accedi da qualsiasi dispositivo, in qualsiasi luogo  
-✅ **Monitoraggio real-time** — Stato stampante, temperature, tempo restante  
-✅ **Pulsanti di emergenza** — Stop e Annulla stampa con eiezione forzata  
+- **Automatic Print Queue** — Upload .gcode files and the system prints them one after another
+- **Automatic Ejection** — Pieces fall from the build plate after printing (no manual intervention)
+- **Filament Selection** — Choose filament color before each print
+- **Continuous Printing Loop** — Automatically continues through all queued files
+- **Web Control** — Access from any device, anywhere in the world
+- **Real-time Monitoring** — Printer status, temperatures, and time remaining
+- **Emergency Controls** — Stop and Cancel buttons with forced ejection
 
 ---
 
-## 📋 Requisiti
+## Getting Started
 
-- **Stampante:** Bambu Lab A1 (256×256mm bed)
-- **Token Bambu:** Email/password account Bambu Lab
-- **PrusaSlicer:** Locale (Bambu Studio o PrusaSlicer standalone)
-- **Render.com account:** Hosting cloud (free tier)
+### Requirements
+
+- Bambu Lab A1 printer
+- Bambu Lab account (email + password)
+- PrusaSlicer or Bambu Studio (local installation)
+- Render.com account (free tier)
+
+### Six-Step Journey
+
+1. **Get Bambu Token** — Authenticate with your Bambu Lab account
+2. **Configure Environment** — Set up .env with credentials
+3. **Deploy to Cloud** — Push to Render for cloud hosting
+4. **Slice Locally** — Generate .gcode files using PrusaSlicer
+5. **Upload & Select** — Load files to queue, choose filament color
+6. **Print Continuously** — System prints automatically, ejects pieces
 
 ---
 
-## 🔧 Setup Iniziale
+## Setup
 
-### 1️⃣ **Ottieni il Token Bambu**
+### Step 1: Clone Repository
+
+```bash
+git clone https://github.com/Leo-color/printqueue.git
+cd printqueue
+```
+
+### Step 2: Obtain Bambu Token
 
 ```bash
 python get_token.py
 ```
 
-Inserisci:
-- Email Bambu Lab
-- Password Bambu Lab
-- Codice 2FA (riceverai email)
+Enter your Bambu Lab credentials and 2FA code when prompted.
 
-Output: `BAMBU_TOKEN` e `BAMBU_UID`
+**Output:**
+- `BAMBU_TOKEN`
+- `BAMBU_UID`
 
-### 2️⃣ **Configura `.env`**
+Save these values for the next step.
+
+### Step 3: Configure .env
+
+Create a file named `.env` in the `printqueue` directory:
 
 ```bash
-BAMBU_TOKEN=xxx
-BAMBU_UID=xxx
-BAMBU_SERIAL=xxxxx  # Serial stampante (vedi etichetta A1)
+BAMBU_TOKEN=<your_token>
+BAMBU_UID=<your_uid>
+BAMBU_SERIAL=<printer_serial>
 BASE_URL=https://printqueue-yjfk.onrender.com
 SECRET_KEY=Leonardo Carlo Manzone
+COOLDOWN_SECONDS=300
+PLATE_X=256.0
+PLATE_Y=256.0
 ```
 
-### 3️⃣ **Deploy su Render**
+**Where to find BAMBU_SERIAL:**
+- Printer Menu → Settings → System Information → Serial Number
+
+### Step 4: Deploy to Render
 
 ```bash
 git push origin main
 ```
 
-Render farà il deploy automaticamente. Guarda lo stato su https://render.com
+Render will automatically build and deploy your application. This takes 2-3 minutes.
 
----
+### Step 5: Access the Application
 
-## 📖 Come Usare
-
-### **Workflow Completo:**
-
-```
-1. Slicing Locale (PrusaSlicer)
-   ↓
-2. Carica .gcode sul sito
-   ↓
-3. Scegli colore filamento
-   ↓
-4. Clicca "▶ Stampa"
-   ↓
-5. Sistema stampa automaticamente
-   ↓
-6. Dopo print → Eiezione automatica
-   ↓
-7. Pezzo cade dal piatto
-   ↓
-8. Continua con prossimo file
-```
-
-### **Step 1: Genera G-code Localmente**
-
-Usa **Bambu Studio** o **PrusaSlicer**:
-
-```bash
-# Oppure via script (local):
-python upload_gcode.py Vortex_Ball.stl 0.2 15 none
-```
-
-Parametri:
-- `0.2` = layer height (mm)
-- `15` = infill (%)
-- `none` = supports (none|tree|linear)
-
-Output: `Vortex_Ball_printqueue.gcode` → Carica questo!
-
-### **Step 2: Accedi al Sito**
-
+Once deployed, visit:
 ```
 https://printqueue-yjfk.onrender.com
-Password: Leonardo Carlo Manzone
 ```
 
-### **Step 3: Carica File**
+Password: `Leonardo Carlo Manzone`
 
-- **Trascina** `.gcode` nella zona grigia, oppure
-- **Clicca** per scegliere il file
-
-Il sito automaticamente:
-- Estrae altezza pezzo dal gcode
-- Inietta sequenza eiezione
-- Aggiunge al file in coda
-
-### **Step 4: Seleziona Colore**
-
-Clicca **"▶ Stampa"** → Scegli cerchio colorato → Clicca **"✓ Stampa"**
-
-I colori vengono dai **slot AMS** della tua stampante (se configurati).
-
-### **Step 5: Monitora**
-
-Nel Log vedi:
-```
-[18:15:59] Connesso al cloud Bambu
-[18:16:05] Upload ricevuto: test.gcode
-[18:16:06] Altezza pezzo: 5.2mm
-[18:16:07] Eject gcode generato
-[18:16:08] Avvio stampa: test.gcode
-[18:16:09] Stampa... 0% | Temp nozzle: 220°C | ~45 min
-```
-
-### **Step 6: Emergenza**
-
-**"■ Stop"** = Ferma stampa, continua con prossimo file  
-**"✕ Annulla"** = Ferma tutto, esegui eiezione forzata, rimuovi file dalla coda  
+Verify that the printer shows as "Connected" in the Printer section.
 
 ---
 
-## 🔄 Sequenza di Eiezione Automatica
+## How to Use
 
-Dopo ogni print, il gcode iniettato esegue:
+### Generate G-code Locally
+
+Use Bambu Studio or PrusaSlicer to slice your STL/OBJ/3MF files:
+
+```
+File → Export → Save as: part.gcode
+```
+
+Or use the local script:
+
+```bash
+python upload_gcode.py part.stl 0.2 15 none
+```
+
+Parameters:
+- `0.2` = Layer height (mm)
+- `15` = Infill (%)
+- `none` = Supports (none|tree|linear)
+
+### Upload to Queue
+
+1. Go to `https://printqueue-yjfk.onrender.com`
+2. Drag and drop your `.gcode` file into the upload area
+3. The system will automatically:
+   - Extract piece height from the file
+   - Inject ejection sequence
+   - Add to print queue
+
+### Start Printing
+
+1. Click the "Play" button to show color selection
+2. Choose a filament color from available slots
+3. Click "Print" to start
+4. Monitor progress in the Log section
+
+The system will:
+- Download the file to your printer via Bambu Cloud
+- Print automatically
+- Execute ejection sequence when complete
+- Continue to the next file in queue
+
+### Monitor in Real-time
+
+The Log section shows:
+- Upload status
+- Print progress (percentage, temperature, time remaining)
+- Ejection status
+- Next file starting
+
+### Emergency Controls
+
+**Stop** — Pause current print, continue with next file  
+**Cancel** — Stop printing completely, execute forced ejection, remove file from queue
+
+---
+
+## Automatic Ejection Sequence
+
+After each print, the injected G-code executes:
 
 ```gcode
-; === AUTO EJECT SEQUENCE ===
-M400                    ; aspetta finché finisce
-M104 S0                 ; estrusore OFF
-M140 S0                 ; piatto OFF
-G4 P300000              ; cooldown 300 secondi
-G28 Z                   ; home Z (sicuro)
-G1 Z25 F600             ; alza 25mm (sopra tutto)
-G1 X128 Y254 F6000      ; posiziona dietro
-G1 Z3 F300              ; abbassa a contatto (delicato)
-G1 Y2 F200              ; spingi in avanti (lento)
-G1 Z20 F600             ; alza subito (pezzo non tocca)
-G28 X Y                 ; home finale
-; === END EJECT ===
+M400                    ; wait for all moves to complete
+M104 S0                 ; nozzle heater off
+M140 S0                 ; bed heater off
+G4 P300000              ; cooldown period (300 seconds)
+G28 Z                   ; home Z axis (safe position)
+G1 Z25 F600             ; raise 25mm (above hotend)
+G1 X128 Y254 F6000      ; move to back center
+G1 Z3 F300              ; lower gently to piece
+G1 Y2 F200              ; push piece forward (slow)
+G1 Z20 F600             ; raise immediately (piece falls free)
+G28 X Y                 ; home XY axes
 ```
 
-**Protezioni:**
-- ✅ Z25 all'inizio (no contatto estrusore)
-- ✅ Spinta F200 (lentissima)
-- ✅ Alza subito dopo (pezzo cade libero)
-- ✅ Cooldown configurable (300s default)
+**Safety Features:**
+- High Z raise prevents nozzle contact
+- Slow push speed ensures controlled movement
+- Immediate raise prevents piece touching hotend during fall
+- Configurable cooldown (30-3600 seconds)
 
 ---
 
-## ⚙️ Configurazione
+## Configuration
 
-### **Raffr Colddown**
+### Cooldown Period
 
-Nel sito, sezione **Impostazioni**:
-```
-Raffreddamento (secondi): 300
-[Salva]
-```
-
-Min: 30s | Max: 3600s
-
-### **Test Eiezione Manuale**
+In the web interface under Settings:
 
 ```
-[Impostazioni] → [Test espulsione manuale]
+Cooldown (seconds): 300
 ```
 
-Esegue l'eiezione senza stampa (utile per debug).
+Adjust if pieces don't fall completely. Increase for larger pieces or sticky PEI.
 
-### **Variabili Ambiente**
+### Test Manual Ejection
 
-```bash
-BAMBU_TOKEN          # Token authentication
-BAMBU_UID            # User ID
-BAMBU_SERIAL         # Printer serial (A1 back panel)
-BASE_URL             # Cloud server URL (Render)
-SECRET_KEY           # Sito password
-COOLDOWN_SECONDS     # Cooldown time (default 300)
-PLATE_X              # Bed width (256 for A1)
-PLATE_Y              # Bed depth (256 for A1)
-```
+Click "Test Manual Ejection" button to run the ejection sequence without printing.
 
 ---
 
-## 📁 Struttura Files
+## Documentation
+
+- **[SETUP.md](SETUP.md)** — Detailed setup instructions
+- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** — Common issues and solutions
+- **[DOCS.md](DOCS.md)** — Documentation index
+
+---
+
+## API Endpoints (Internal)
 
 ```
-printqueue/
-├── app.py                 # Flask backend (API, web UI)
-├── bambu.py              # Cloud MQTT communication
-├── upload_gcode.py       # Local slicing tool
-├── get_token.py          # Token acquisition (2FA)
-├── requirements.txt      # Python dependencies
-├── build.sh              # Render build script
-├── render.yaml           # Render deployment config
-├── .env                  # Secrets (NEVER commit!)
-├── uploads/              # Gcode files storage
-└── README.md             # This file
+POST  /login                    # Web interface login
+POST  /api/upload               # Upload G-code file
+GET   /api/status               # Get printer status and queue
+POST  /api/start                # Start print automation
+POST  /api/stop                 # Stop automation (continue next)
+POST  /api/cancel               # Cancel with forced ejection
+POST  /api/cooldown             # Update cooldown seconds
+POST  /api/eject                # Manual ejection test
+GET   /api/ams                  # Get available filament colors
+GET   /files/<filename>         # Download G-code file
 ```
 
 ---
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
-### **Stampante non connessa**
-
-```
-[❌] Non connesso
-```
-
-**Soluzione:**
-1. Verifica token Bambu: `python get_token.py`
-2. Verifica serial stampante in `.env`
-3. Riavvia sito: `git push` (Render redeploy)
-
-### **Upload fallisce**
+### Printer Not Connected
 
 ```
-ERROR uploading: Upload fallito
+Status: Not Connected
 ```
 
-**Soluzione:**
-1. File deve finire con `.gcode`
-2. Check file size (max 100MB)
-3. Guarda il Log nel sito
+**Solution:**
+1. Run `python get_token.py` for fresh token
+2. Verify printer serial in .env
+3. Deploy: `git push origin main`
 
-### **Stampa non parte**
+### Upload Fails
 
-```
-[Status] printing: 0%
-[Log] Avvio stampa... (resta bloccato)
-```
+Ensure:
+- File ends with `.gcode`
+- File size under 100MB
+- Using correct password
 
-**Soluzione:**
-1. Controlla che stampante sia online (sezione Stampante)
-2. Clicca "■ Stop", poi riprova
-3. Se ancora bloccato, clicca "✕ Annulla" → Eiezione forzata
+### Piece Doesn't Fall
 
-### **Pezzo non cade**
+**Solution:**
+1. Increase cooldown to 600 seconds
+2. Click "Test Manual Ejection"
+3. Check if piece is stuck to PEI plate
 
-```
-[Log] Eiezione completata. (Ma pezzo resta sul piatto)
-```
-
-**Soluzione:**
-1. Pezzo potrebbe essere incollato al piatto
-2. Aumenta `Raffreddamento` a 600 secondi (più tempo per ritrarre)
-3. Clicca "Test espulsione manuale" per riprovare
-4. Se ancora no: togli manualmente, verifica PEI plate
+For more issues, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 
 ---
 
-## 📊 API Endpoints (interno)
+## Support
 
-```bash
-POST /login                      # Login sito
-POST /api/upload                 # Upload gcode
-GET  /api/status                 # Stato stampante + coda
-POST /api/start                  # Avvia automazione
-POST /api/stop                   # Ferma (continua prossimo)
-POST /api/cancel                 # Annulla (eiezione forzata)
-POST /api/cooldown               # Cambia cooldown
-POST /api/eject                  # Test eiezione manuale
-POST /api/remove                 # Rimuovi file dalla coda
-GET  /api/ams                    # Slot filamento disponibili
-GET  /files/<filename>           # Scarica gcode (per stampante)
-```
+Check the Log section in the web interface for real-time debugging information.
+
+For detailed help, see:
+- [SETUP.md](SETUP.md) — Setup instructions
+- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) — Common problems
+- [DOCS.md](DOCS.md) — Complete documentation index
 
 ---
 
-## 🔐 Sicurezza
+## License
 
-⚠️ **IMPORTANTE:**
-- `.env` non è mai committato (`.gitignore`)
-- Sito ha password (vedi `.env: SECRET_KEY`)
-- Token Bambu è privato — non condividere!
+Personal automation project for Bambu Lab A1.
 
 ---
 
-## 📝 Licenza
-
-Progetto personale per Bambu Lab A1 automation.
-
----
-
-## 💬 Support
-
-Controlla il **Log** nel sito per debug in tempo reale. Mostra ogni step dell'automazione.
-
-**Ultimo aggiornamento:** Giugno 2026
+*Print Queue Automation v1.0 — June 2026*

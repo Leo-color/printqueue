@@ -1,187 +1,275 @@
-# 📚 Documentazione Completa — Print Queue
+# Documentation Index
 
-Indice di **tutti i documenti** per usare il sistema.
-
----
-
-## 🎯 Scegli la Tua Guida
-
-### 👤 **Sono nuovo — voglio capire**
-→ Leggi: **[README.md](README.md)**
-- Cos'è il sistema
-- Funzionalità principali
-- Workflow completo
-- API endpoints
+Find the documentation you need.
 
 ---
 
-### 🔧 **Voglio installarlo da zero**
-→ Leggi: **[SETUP.md](SETUP.md)**
-- Prerequisites
-- Ottieni token Bambu
-- Configura .env
-- Deploy su Render
-- Prima stampa
+## Documentation Overview
+
+| Document | Purpose | Read When |
+|----------|---------|-----------|
+| **[README.md](README.md)** | Complete feature overview and usage guide | First-time users and reference |
+| **[SETUP.md](SETUP.md)** | Step-by-step installation instructions | Setting up the system |
+| **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** | Problem diagnosis and solutions | Experiencing issues |
+| **[DOCS.md](DOCS.md)** | This documentation index | Finding what you need |
 
 ---
 
-### 🆘 **Qualcosa non funziona**
-→ Leggi: **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)**
-- Errori comuni
-- Soluzioni rapide
-- Debug avanzato
-- FAQ
+## Quick Start
+
+### New User
+
+Start here → [README.md](README.md)
+
+Key sections:
+- Getting Started (5 minutes)
+- How to Use (complete workflow)
+- Automatic Ejection Sequence
+
+### Setting Up
+
+Follow → [SETUP.md](SETUP.md)
+
+Seven-step journey:
+1. Clone Repository
+2. Obtain Bambu Token
+3. Create .env File
+4. Test Locally
+5. Deploy to Render
+6. Verify Connection
+7. First Print
+
+### Experiencing Issues
+
+Check → [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+
+Common issues:
+- Printer Not Connected
+- Upload File Fails
+- Print Won't Start
+- Piece Won't Fall
+- Render Deployment Issues
 
 ---
 
-## 📖 Tutti i Documenti
+## Feature Overview
 
-| Documento | Descrizione | Quando leggere |
-|-----------|------------|-----------------|
-| **[README.md](README.md)** | Guida generale completa | Sempre (reference) |
-| **[SETUP.md](SETUP.md)** | Setup passo-passo | Prima di usare |
-| **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** | Problemi e soluzioni | Quando c'è un errore |
-| **[DOCS.md](DOCS.md)** | Questo file (indice) | Orientamento |
+### Automatic Print Queue
+
+Upload multiple `.gcode` files and the system prints them sequentially without intervention.
+
+[Learn more →](README.md#key-features)
+
+### Automatic Ejection
+
+After each print completes, the piece automatically falls from the build plate.
+
+[Learn more →](README.md#automatic-ejection-sequence)
+
+### Filament Selection
+
+Choose from available filament colors in your Bambu Lab AMS before each print.
+
+[Learn more →](README.md#start-printing)
+
+### Real-time Monitoring
+
+Monitor printer status, temperatures, and progress through the web interface.
+
+[Learn more →](README.md#monitor-in-real-time)
 
 ---
 
-## 🚀 Quick Start (5 minuti)
+## Setup Checklist
 
-```bash
-# 1. Clona
-git clone https://github.com/Leo-color/printqueue.git
-cd printqueue
+Use this when setting up:
 
-# 2. Token Bambu
-python get_token.py
-# → Salva BAMBU_TOKEN e BAMBU_UID
+- [ ] Cloned repository
+- [ ] Ran `python get_token.py`
+- [ ] Created `.env` file with credentials
+- [ ] Tested locally with `python app.py`
+- [ ] Created Render account
+- [ ] Connected GitHub repository to Render
+- [ ] Set environment variables in Render
+- [ ] Pushed with `git push origin main`
+- [ ] Verified printer shows "Connected"
+- [ ] Generated first `.gcode` file
+- [ ] Uploaded file and started print
+- [ ] Piece fell after print completed
 
-# 3. Configura .env
-echo "BAMBU_TOKEN=xyz" > .env
-echo "BAMBU_UID=999" >> .env
-echo "BAMBU_SERIAL=Mxxxxxxx" >> .env
-echo "BASE_URL=https://printqueue-yjfk.onrender.com" >> .env
+If all checked: System is ready!
 
-# 4. Deploy
-git push origin main
-# Attendi 3 minuti, poi accedi a:
-# https://printqueue-yjfk.onrender.com
+---
+
+## Configuration Reference
+
+### Environment Variables (.env)
+
+```
+BAMBU_TOKEN          # From python get_token.py
+BAMBU_UID            # From python get_token.py
+BAMBU_SERIAL         # Printer serial number (from label)
+BASE_URL             # https://printqueue-yjfk.onrender.com
+SECRET_KEY           # Web interface password
+COOLDOWN_SECONDS     # Cooldown time (default 300)
+PLATE_X              # Build plate width (256 for A1)
+PLATE_Y              # Build plate depth (256 for A1)
 ```
 
+### Web Interface Settings
+
+**Cooldown (seconds):** 30 to 3600 seconds
+
+Increase for:
+- Larger pieces
+- Sticky PEI plates
+- Complex geometries
+
 ---
 
-## 🎮 Workflow Tipico
+## API Reference
+
+### Upload G-code
 
 ```
-1. Slicing Locale (PrusaSlicer)
-   ↓
-2. Carica .gcode sul sito
-   ↓
-3. Scegli colore
-   ↓
-4. Clicca "▶ Stampa"
-   ↓
-5. Sistema stampa automaticamente
-   ↓
-6. Pezzo cade (eiezione automatica)
-   ↓
-7. Continua prossimo file
+POST /api/upload
 ```
 
-Per dettagli: vedi [README.md#come-usare](README.md#come-usare)
+Accepts `.gcode` files and injects ejection sequence.
 
----
+### Get Status
 
-## 🔑 Configurazione Essenziale
-
-```bash
-# File: .env
-BAMBU_TOKEN=xxxxx           # Da python get_token.py
-BAMBU_UID=99999             # Da python get_token.py
-BAMBU_SERIAL=Mxxxxxxx       # Dal retro A1
-BASE_URL=https://printqueue-yjfk.onrender.com
-SECRET_KEY=Leonardo Carlo Manzone
+```
+GET /api/status
 ```
 
+Returns:
+- Printer connection status
+- Print queue
+- Current job status
+- Temperature data
+- Log entries
+
+### Start/Stop Automation
+
+```
+POST /api/start     # Start printing automation
+POST /api/stop      # Stop (continue next file)
+POST /api/cancel    # Cancel (forced ejection, remove file)
+```
+
+### Get Filament Colors
+
+```
+GET /api/ams
+```
+
+Returns available filament slots from printer.
+
+[See full API reference →](README.md#api-endpoints-internal)
+
 ---
 
-## 🐛 Problemi Rapidi
-
-| Problema | Soluzione | Dove leggere |
-|----------|-----------|--------------|
-| **Stampante non connessa** | Nuovo token con `python get_token.py` | [TROUBLESHOOTING](TROUBLESHOOTING.md#stampante-non-connessa) |
-| **Upload fallisce** | File deve essere `.gcode` | [TROUBLESHOOTING](TROUBLESHOOTING.md#upload-file-fallisce) |
-| **Stampa non parte** | Verifica stampante online | [TROUBLESHOOTING](TROUBLESHOOTING.md#stampa-non-parte) |
-| **Pezzo non cade** | Aumenta cooldown a 600s | [TROUBLESHOOTING](TROUBLESHOOTING.md#pezzo-non-cade) |
-| **Deploy fallisce su Render** | Vedi log Render | [TROUBLESHOOTING](TROUBLESHOOTING.md#problemi-render) |
-
----
-
-## 📁 Struttura Repo
+## File Structure
 
 ```
 printqueue/
-├── README.md                 # ← Leggi prima
-├── SETUP.md                  # ← Poi questo
-├── TROUBLESHOOTING.md        # ← Se problemi
-├── DOCS.md                   # ← Questo (indice)
-├── .env                      # ⚠️ Secrets (gitignored)
-├── app.py                    # Flask backend
-├── bambu.py                  # MQTT cloud
-├── get_token.py              # Token Bambu 2FA
-├── upload_gcode.py           # Slicing locale
-├── requirements.txt
-├── build.sh
-├── render.yaml
-└── uploads/                  # Gcode files (auto)
+├── README.md                 # Main documentation
+├── SETUP.md                  # Setup instructions
+├── TROUBLESHOOTING.md        # Troubleshooting guide
+├── DOCS.md                   # This file
+├── app.py                    # Flask web server
+├── bambu.py                  # Bambu Cloud MQTT
+├── get_token.py              # Token acquisition
+├── upload_gcode.py           # Local slicing
+├── requirements.txt          # Python dependencies
+├── build.sh                  # Render build script
+├── render.yaml               # Render configuration
+├── .env                      # Configuration (secrets)
+└── uploads/                  # Uploaded G-code files
 ```
 
 ---
 
-## 💬 Contatti & Support
+## System Requirements
 
-### Prima di contattare:
+### Hardware
 
-1. ✅ Leggi [README.md](README.md)
-2. ✅ Leggi [SETUP.md](SETUP.md)
-3. ✅ Leggi [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
-4. ✅ Guarda il **Log** nel sito
+- Bambu Lab A1 printer
+- Computer for local slicing
+- Internet connection (for cloud access)
 
-### Se ancora non funziona:
+### Software
 
-- GitHub Issues: https://github.com/Leo-color/printqueue/issues
-- Descrivi il problema e il Log esatto
+- Python 3.8+
+- Git
+- PrusaSlicer or Bambu Studio
 
----
+### Accounts
 
-## 🔄 Versioni Docs
-
-| Versione | Data | Nota |
-|----------|------|------|
-| 1.0 | Giugno 2026 | Release iniziale |
+- Bambu Lab account (for token authentication)
+- Render account (for cloud hosting, free tier available)
 
 ---
 
-## ✅ Checklist Primo Setup
+## Key Concepts
 
-- [ ] Ho clonato il repo
-- [ ] Ho creato token con `python get_token.py`
-- [ ] Ho configurato `.env` con token, serial, URL
-- [ ] Ho fatto `git push origin main`
-- [ ] Render ha finito il deploy
-- [ ] Accedo a sito e vedo "Connesso" ✅
-- [ ] Carico un file `.gcode`
-- [ ] Clicco "▶ Stampa"
-- [ ] Stampante inizia a stampare
-- [ ] Pezzo cade dopo print ✨
+### Automatic Ejection
 
-Se ✅ tutto: **Sistema pronto!** 🚀
+The system automatically injects a G-code sequence at the end of each print that:
+1. Cools the hotend and bed
+2. Waits configurable cooldown period
+3. Positions nozzle at print center-back
+4. Lowers nozzle to piece surface
+5. Pushes piece toward front
+6. Raises nozzle above plate
+7. Homes axes
+
+[Learn more →](README.md#automatic-ejection-sequence)
+
+### Print Queue
+
+Upload multiple files. System processes them sequentially, printing each file and executing ejection between prints.
+
+### Filament Selection
+
+Before each print, choose the filament color from available AMS slots. The system uses this for reporting and organization.
+
+### Cloud Control
+
+Access the system from anywhere via Render cloud hosting. Uses Bambu Cloud MQTT for printer communication.
 
 ---
 
-**Buona stampa! 🖨️✨**
+## Getting Help
+
+### Troubleshooting Steps
+
+1. Check [README.md](README.md) for feature details
+2. Check [SETUP.md](SETUP.md) for setup help
+3. Check [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for error solutions
+4. Check Log section in web interface
+
+### Common Solutions
+
+| Issue | Solution |
+|-------|----------|
+| Printer not connected | Run `python get_token.py` again |
+| Upload fails | Ensure file ends with `.gcode` |
+| Print won't start | Check printer is online |
+| Piece won't fall | Increase cooldown in Settings |
+| Render deploy fails | Check Render logs, redeploy |
 
 ---
 
-*Ultima modifica: Giugno 2026*
-*Print Queue v1.0 — Bambu Lab A1 Automation*
+## Support
+
+For additional help:
+- Check all documentation sections
+- Review Log in web interface
+- Verify all configuration steps completed
+- Test manual ejection from Settings
+
+---
+
+*Documentation v1.0 — June 2026*
