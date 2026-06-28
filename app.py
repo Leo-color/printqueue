@@ -693,11 +693,28 @@ async function showColorSelector(){
     alert('Carica un file .gcode prima!');
     return;
   }
-  // Carica colori disponibili
-  const r=await fetch('/api/ams').then(r=>r.json());
+
+  document.getElementById('color-panel').style.display='';
+  document.getElementById('print-btn').disabled=true;
+
+  // Carica colori con retry (aspetta che stampante invii dati)
+  let slots_data = [];
+  for(let attempt=0;attempt<3;attempt++){
+    const r=await fetch('/api/ams').then(r=>r.json());
+    slots_data = r.slots || [];
+    if(slots_data.length > 0) break;
+    if(attempt < 2) await new Promise(resolve=>setTimeout(resolve,500)); // attendi 500ms
+  }
+
   const slots=document.getElementById('ams-slots');
   slots.innerHTML='';
-  for(const s of r.slots){
+
+  if(slots_data.length === 0){
+    slots.innerHTML='<p style="font-size:.75rem;color:#666">Nessun colore disponibile (AMS non configurato)</p>';
+    return;
+  }
+
+  for(const s of slots_data){
     const btn=document.createElement('div');
     btn.style.cssText=`width:40px;height:40px;border-radius:50%;background:${s.color};cursor:pointer;border:3px solid transparent;transition:.15s`;
     btn.title=s.material+' — '+s.name;
@@ -709,8 +726,6 @@ async function showColorSelector(){
     if(!slots.children.length){btn.style.borderColor='#fff';selectedPrintColor=s.color;}
     slots.appendChild(btn);
   }
-  document.getElementById('color-panel').style.display='';
-  document.getElementById('print-btn').disabled=true;
 }
 
 function cancelPrint(){
