@@ -234,6 +234,8 @@ def upload():
         return jsonify({"ok": False, "error": "Nessun file"}), 400
 
     added = []
+    cooldown = int(request.form.get("cooldown", 300))
+
     for f in files:
         log(f"Processing: {f.filename}")
         if not f.filename.endswith(".gcode"):
@@ -244,12 +246,27 @@ def upload():
         try:
             f.save(str(dest))
             log(f"Saved to: {dest}")
-            queue.append({"name": f.filename, "path": str(dest), "status": "queued"})
+
+            # Estrai altezza pezzo e inietta sequenza eiezione
+            piece_h = BambuCloud.extract_piece_height(str(dest))
+            log(f"Piece height detected: {piece_h}mm")
+
+            eject_gcode_path = BambuCloud.inject_eject_gcode(
+                str(dest),
+                plate_x_mm=256.0,
+                plate_y_mm=256.0,
+                cooldown_seconds=cooldown,
+                piece_height_mm=piece_h
+            )
+            log(f"Eject gcode generated: {eject_gcode_path}")
+
+            # Usa il file con eiezione come file principale
+            queue.append({"name": f.filename, "path": eject_gcode_path, "status": "queued"})
             added.append(f.filename)
-            log(f"Aggiunto in coda: {f.filename}")
+            log(f"Aggiunto in coda (con eiezione): {f.filename}")
         except Exception as e:
-            log(f"ERROR saving {f.filename}: {e}")
-            return jsonify({"ok": False, "error": f"Save error: {e}"}), 500
+            log(f"ERROR processing {f.filename}: {e}")
+            return jsonify({"ok": False, "error": f"Processing error: {e}"}), 500
 
     return jsonify({"ok": True, "added": added})
 
