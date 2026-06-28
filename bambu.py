@@ -34,12 +34,12 @@ M104 S0
 M140 S0
 G4 P{cooldown_ms}
 G28 Z
-G1 Z15 F600
-G1 X{center_x} Y{back_y} F6000
-G1 Z{push_z} F300
-G1 Y{front_y} F300
-G1 Y{back_y} F6000
-G28 X Y
+G1 Z25 F600              ; alza BENE (no touch estrusore)
+G1 X{center_x} Y{back_y} F6000 ; posiziona dietro
+G1 Z{push_z} F300        ; abbassa a contatto
+G1 Y{front_y} F200       ; SPINGI in avanti (lento)
+G1 Z20 F600              ; ALZA SUBITO (pezzo non tocca estrusore)
+G28 X Y                  ; home
 ; === END EJECT ===
 """
 
