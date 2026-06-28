@@ -360,6 +360,12 @@ def get_ams():
     return jsonify({"ok": True, "slots": slots})
 
 
+@app.route("/files/<filename>")
+def serve_gcode(filename):
+    """Serve gcode files to printer for download."""
+    if not filename.endswith(".gcode"):
+        return "Invalid file", 403
+    return send_from_directory(UPLOAD_FOLDER, filename)
 
 
 # ── HTML ──────────────────────────────────────────────────────────────────────
