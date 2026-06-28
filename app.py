@@ -302,6 +302,38 @@ def stop_auto():
     log("Stop richiesto")
     return jsonify({"ok": True})
 
+@app.route("/api/cancel", methods=["POST"])
+@login_required
+def cancel_job():
+    global running, current_job, queue
+    running = False
+    log("Annulla stampa richiesto")
+
+    # Rimuovi il job corrente
+    if current_job:
+        queue = [j for j in queue if j["name"] != current_job["name"]]
+        log(f"Annullato: {current_job['name']} — esecuzione eiezione forzata...")
+
+        # Esegui eiezione forzata anche se stampa fallita
+        try:
+            piece_h = BambuCloud.extract_piece_height(current_job["path"])
+            eject_path = BambuCloud.inject_eject_gcode(
+                current_job["path"],
+                plate_x_mm=PLATE_X,
+                plate_y_mm=PLATE_Y,
+                cooldown_seconds=10,  # Cooldown rapido per annullamento
+                piece_height_mm=piece_h
+            )
+            gcode_url = f"{BASE_URL}/files/{Path(eject_path).name}"
+            printer.start_print_from_url(gcode_url)
+            log("Eiezione forzata avviata...")
+            time.sleep(20)  # Aspetta che l'eiezione finisca
+            log("Eiezione completata. File rimosso dalla coda.")
+        except Exception as e:
+            log(f"Eiezione forzata fallita: {e}")
+
+    return jsonify({"ok": True})
+
 @app.route("/api/cooldown", methods=["POST"])
 @login_required
 def set_cooldown():
@@ -495,7 +527,8 @@ button{width:100%;margin-top:8px;padding:8px;border:none;border-radius:7px;font-
 
     <div class="row" style="margin-top:10px">
       <button class="g" id="print-btn" onclick="showColorSelector()">▶ Stampa</button>
-      <button class="r" onclick="stopAuto()">■ Stop</button>
+      <button class="r" id="stop-btn" onclick="stopAuto()" style="display:none">■ Stop</button>
+      <button class="r" id="cancel-btn" onclick="cancelCurrentJob()" style="display:none">✕ Annulla</button>
     </div>
   </div>
   <div class="card">
@@ -593,6 +626,10 @@ async function refresh(){
   }
   document.getElementById('pi').innerHTML=info;
   const ql=document.getElementById('ql');
+  const isPrinting=d.queue.some(j=>j.status==='printing');
+  document.getElementById('print-btn').style.display=isPrinting?'none':'';
+  document.getElementById('stop-btn').style.display=isPrinting?'':'none';
+  document.getElementById('cancel-btn').style.display=isPrinting?'':'none';
   ql.innerHTML=d.queue.length
     ?d.queue.map(j=>`<div class="qi"><span title="${j.name}">${j.name}</span><div style="display:flex;gap:5px;align-items:center"><span class="badge b${j.status[0]}">${j.status}</span>${j.status==='queued'?`<button onclick="removeJob('${j.name}')" style="background:none;border:none;color:#444;cursor:pointer;font-size:.8rem;margin:0;width:auto;padding:0 2px">✕</button>`:''}</div></div>`).join('')
     :'<p style="font-size:.75rem;color:#333;text-align:center;padding:10px">Nessun file in coda</p>';
@@ -640,6 +677,13 @@ async function startPrintWithColor(){
   cancelPrint();
   // Avvia la stampa con il colore selezionato
   await startAuto();
+}
+
+async function cancelCurrentJob(){
+  if(!confirm('Fermare la stampa e togliere il pezzo dal piatto?')) return;
+  const d=await post('/api/cancel',{});
+  if(!d.ok) alert('Errore: '+d.error);
+  refresh();
 }
 
 setInterval(refresh,5000);
