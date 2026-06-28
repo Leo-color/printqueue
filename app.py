@@ -179,12 +179,6 @@ def logout():
 def index():
     return render_template_string(HTML_TEMPLATE)
 
-@app.route("/files/<filename>")
-@login_required
-def serve_gcode(filename):
-    """Printer downloads the gcode file from here."""
-    return send_from_directory(UPLOAD_FOLDER, filename)
-
 @app.route("/api/connect", methods=["POST"])
 @login_required
 def connect():
