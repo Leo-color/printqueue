@@ -490,8 +490,13 @@ button{width:100%;margin-top:8px;padding:8px;border:none;border-radius:7px;font-
   </div>
   <div class="card">
     <h2>Stato Stampante</h2>
-    <div id="pi" style="font-size:.75rem;color:#555">—</div>
-    <div class="bar"><div class="fill" id="prog" style="width:0%"></div></div>
+    <div id="conn-status" style="font-size:.82rem;margin-bottom:8px;color:#888">Connessione: —</div>
+    <div id="print-status" style="font-size:.78rem;color:#aaa;margin-bottom:8px">Non stampa</div>
+    <div id="print-file" style="font-size:.75rem;color:#666;margin-bottom:8px;max-height:20px;overflow:hidden;text-overflow:ellipsis">—</div>
+    <div id="print-time" style="font-size:.75rem;color:#666;margin-bottom:10px">Tempo: —</div>
+    <div class="bar"><div class="fill" id="prog" style="width:0%;transition:width .3s"></div></div>
+    <div id="print-percent" style="font-size:.75rem;color:#888;margin-top:4px;text-align:center">0%</div>
+    <div id="next-action" style="margin-top:10px"></div>
   </div>
 </div>
 <div>
@@ -617,17 +622,48 @@ async function removeJob(n){await post('/api/remove',{name:n});refresh()}
 
 async function refresh(){
   const d=await fetch('/api/status').then(r=>r.json());
+
+  // Connessione
   document.getElementById('cs').innerHTML=d.connected
     ?'<span class="dot dg"></span>Connesso'
     :'<span class="dot dr"></span>Non connesso';
+  document.getElementById('conn-status').innerHTML=d.connected
+    ?'<span class="dot dg"></span>Connesso al cloud Bambu'
+    :'<span class="dot dr"></span>Non connesso';
+
   const p=d.printer;
-  let info='—';
-  if(d.connected&&Object.keys(p).length){
-    const prog=p.mc_percent||0;
+  const job=d.queue.find(j=>j.status==='printing');
+  const prog=p.mc_percent||0;
+  const state=p.gcode_state||'idle';
+
+  // Stato stampa
+  if(job){
+    document.getElementById('print-status').innerHTML='<span style="color:#4ade80">▶ Stampa in corso</span>';
+    document.getElementById('print-file').innerHTML='📄 '+job.name;
+    document.getElementById('print-time').innerHTML='⏱ ~'+Math.max(0,p.mc_remaining_time||0)+' min';
     document.getElementById('prog').style.width=prog+'%';
-    info=`<b>${p.gcode_state||'—'}</b> | Estrusore: ${(p.nozzle_temper||0).toFixed(0)}°C | Piatto: ${(p.bed_temper||0).toFixed(0)}°C | ${prog}% | ~${p.mc_remaining_time||0} min`;
+    document.getElementById('print-percent').innerHTML=prog+'%';
+  }else if(state.toLowerCase()==='finish'||state.toLowerCase()==='idle'){
+    document.getElementById('print-status').innerHTML='✅ Pronto';
+    document.getElementById('print-file').innerHTML='—';
+    document.getElementById('print-time').innerHTML='Tempo: —';
+    document.getElementById('prog').style.width='0%';
+    document.getElementById('print-percent').innerHTML='0%';
+  }else{
+    document.getElementById('print-status').innerHTML='<span style="color:#f97316">⏳ '+state+'</span>';
+    document.getElementById('print-file').innerHTML='—';
+    document.getElementById('print-time').innerHTML='Tempo: '+p.mc_remaining_time+' min';
+    document.getElementById('prog').style.width=prog+'%';
+    document.getElementById('print-percent').innerHTML=prog+'%';
   }
-  document.getElementById('pi').innerHTML=info;
+
+  // Bottone "Avvia Stampa" se pronto
+  const nextAction=document.getElementById('next-action');
+  if(!job&&d.queue.some(q=>q.status==='queued')){
+    nextAction.innerHTML='<button class="g" style="width:100%" onclick="showColorSelector()">▶ Avvia Stampa</button>';
+  }else{
+    nextAction.innerHTML='';
+  }
   const ql=document.getElementById('ql');
   const isPrinting=d.queue.some(j=>j.status==='printing');
   document.getElementById('print-btn').style.display=isPrinting?'none':'';
