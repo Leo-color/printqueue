@@ -498,14 +498,8 @@ button{width:100%;margin-top:8px;padding:8px;border:none;border-radius:7px;font-
   <!-- Upload gcode -->
   <div class="card">
     <h2>Aggiungi alla Coda</h2>
-    <p style="font-size:.78rem;color:#aaa;margin-bottom:12px">
-      📄 <strong>Carica file .gcode</strong> generati con <code>upload_gcode.py</code> sul tuo PC<br>
-      STL/OBJ/3MF si sliciano localmente, poi si uploadano qui.
-    </p>
-    <div class="dz" id="dz" onclick="document.getElementById('fi').click()">
-      <p>Trascina file .gcode qui<br>oppure clicca per scegliere</p>
-      <input id="fi" type="file" accept=".gcode" multiple onchange="uploadGcode(this.files)">
-    </div>
+    <button class="g" style="width:100%;margin-bottom:10px" onclick="document.getElementById('gcode-input').click()">+ Carica File .gcode</button>
+    <input id="gcode-input" type="file" accept=".gcode" multiple style="display:none" onchange="uploadGcodeFiles(this.files)">
 
     <div id="ql" style="margin-top:10px"></div>
 
@@ -539,12 +533,27 @@ dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('ov');uplo
 
 async function post(url,body){return fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json())}
 
-async function uploadGcode(files){
+async function uploadGcodeFiles(files){
+  if(!files||files.length===0)return;
   const fd=new FormData();
-  for(const f of files)if(f.name.endsWith('.gcode'))fd.append('file',f);
+  for(const f of files){
+    if(f.name.endsWith('.gcode')){
+      fd.append('file',f);
+      console.log('Uploading:',f.name);
+    }
+  }
+  if(fd.getAll('file').length===0){
+    alert('Nessun file .gcode selezionato');
+    return;
+  }
   const r=await fetch('/api/upload',{method:'POST',body:fd});
   const d=await r.json();
-  if(!d.ok)alert(d.error);
+  console.log('Upload response:',d);
+  if(!d.ok){
+    alert('Errore upload: '+d.error);
+  }else{
+    alert('Caricato: '+d.added.join(', '));
+  }
   refresh();
 }
 async function startAuto(){const d=await post('/api/start',{});if(!d.ok)alert(d.error);else refresh()}
