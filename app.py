@@ -224,20 +224,32 @@ def status():
 @app.route("/api/upload", methods=["POST"])
 @login_required
 def upload():
+    log(f"Upload request: files={list(request.files.keys())}")
+
     # Accetta sia 'file' che 'files' per compatibilità
     files = request.files.getlist("file") or request.files.getlist("files")
+    log(f"Parsed files: {len(files)} file(s)")
+
     if not files:
         return jsonify({"ok": False, "error": "Nessun file"}), 400
 
     added = []
     for f in files:
+        log(f"Processing: {f.filename}")
         if not f.filename.endswith(".gcode"):
+            log(f"Skipped (not .gcode): {f.filename}")
             continue
+
         dest = UPLOAD_FOLDER / f.filename
-        f.save(str(dest))
-        queue.append({"name": f.filename, "path": str(dest), "status": "queued"})
-        added.append(f.filename)
-        log(f"Aggiunto: {f.filename}")
+        try:
+            f.save(str(dest))
+            log(f"Saved to: {dest}")
+            queue.append({"name": f.filename, "path": str(dest), "status": "queued"})
+            added.append(f.filename)
+            log(f"Aggiunto in coda: {f.filename}")
+        except Exception as e:
+            log(f"ERROR saving {f.filename}: {e}")
+            return jsonify({"ok": False, "error": f"Save error: {e}"}), 500
 
     return jsonify({"ok": True, "added": added})
 
