@@ -5,12 +5,47 @@ An automated continuous printing system with automatic piece ejection for Bambu 
 ## Key Features
 
 - **Automatic Print Queue** — Upload .gcode files and the system prints them one after another
-- **Automatic Ejection** — Pieces fall from the build plate after printing (no manual intervention)
+- **Automatic Piece Ejection** — Nozzle automatically pushes completed pieces off the plate (active movement, no mechanical parts needed)
 - **Filament Selection** — Choose filament color before each print
 - **Continuous Printing Loop** — Automatically continues through all queued files
 - **Web Control** — Access from any device, anywhere in the world
 - **Real-time Monitoring** — Printer status, temperatures, and time remaining
 - **Emergency Controls** — Stop and Cancel buttons with forced ejection
+
+## What Makes This Different
+
+Unlike static ejection systems (FarmLoop Stage 1), this system uses **active nozzle movement** to push pieces off the plate:
+- No mechanical parts needed
+- Works with any Bambu Lab A1
+- Reliable and repeatable
+- Fully automated via G-code injection
+
+---
+
+## How It Works
+
+The system automatically injects a specialized G-code sequence at the end of each print that uses the nozzle itself to eject pieces:
+
+1. **Cooldown** — Let the part cool
+2. **Position** — Move nozzle to piece location
+3. **Push** — Use nozzle to push piece forward
+4. **Eject** — Piece falls off plate
+5. **Home** — Return to safe position
+
+No mechanical parts, actuators, or modifications needed. Pure G-code automation.
+
+---
+
+## Compared to Other Systems
+
+| Feature | This System | FarmLoop Stage 1 | FarmLoop Stage 2 |
+|---------|-------------|-----------------|-----------------|
+| **Ejection Method** | Active nozzle push | Static scraper | Linear actuator |
+| **Mechanical Parts** | None | Yes | Yes |
+| **Setup Complexity** | Easy | Moderate | Complex |
+| **Cost** | Free | ~$50 | ~$300+ |
+| **Reliability** | High | High | Very High |
+| **Automation** | 100% cloud | Partial | Full electronics |
 
 ---
 
