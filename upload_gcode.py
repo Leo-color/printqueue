@@ -111,29 +111,11 @@ def upload_to_render(gcode_path: str):
     print(f"✓ In coda su {RENDER_URL}")
 
 def find_file(filename: str) -> str:
-    """Cerca il file. Prova percorso relativo, poi Desktop/Documents/Downloads."""
+    """Cerca il file nella cartella corrente."""
     p = Path(filename)
     if p.exists():
         return str(p.resolve())
-
-    # Cerca nelle cartelle comuni
-    search_dirs = [
-        Path.home() / "Desktop",
-        Path.home() / "Documents",
-        Path.home() / "Downloads",
-        Path.home(),
-    ]
-
-    print(f"Cerco {filename}...")
-    for search_dir in search_dirs:
-        if not search_dir.exists():
-            continue
-        for found in search_dir.rglob(f"*{Path(filename).suffix}"):
-            if found.name == filename:
-                print(f"✓ Trovato: {found}")
-                return str(found)
-
-    raise FileNotFoundError(f"File non trovato: {filename}\nCerca in Desktop, Documents, o Downloads")
+    raise FileNotFoundError(f"File non trovato: {filename}\nMetti il file nella cartella corrente")
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
