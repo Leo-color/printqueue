@@ -365,24 +365,25 @@ def manual_eject():
 @app.route("/api/ams")
 @login_required
 def get_ams():
-    """Return AMS filament slots from printer status."""
+    """Return ONLY actual AMS filament slots from printer cloud."""
     if not printer:
         return jsonify({"ok": False, "slots": []})
     st = printer.get_status()
     slots = []
     ams_data = st.get("ams", {})
-    ams_list = ams_data.get("ams", []) if isinstance(ams_data, dict) else []
-    for ams_unit in ams_list:
-        for tray in ams_unit.get("tray", []):
-            slots.append({
-                "id": tray.get("id", ""),
-                "color": "#" + tray.get("tray_color", "FFFFFF")[:6],
-                "material": tray.get("tray_type", "PLA"),
-                "name": tray.get("tray_sub_brands", tray.get("tray_type", "PLA")),
-            })
-    # Also check single-color (no AMS)
-    if not slots:
-        slots.append({"id": "0", "color": "#FF8000", "material": "PLA", "name": "Filamento caricato"})
+
+    # Read ONLY actual filaments from AMS (via cloud MQTT)
+    if isinstance(ams_data, dict):
+        ams_list = ams_data.get("ams", [])
+        for ams_unit in ams_list:
+            for tray in ams_unit.get("tray", []):
+                slots.append({
+                    "id": tray.get("id", ""),
+                    "color": "#" + tray.get("tray_color", "FFFFFF")[:6],
+                    "material": tray.get("tray_type", "PLA"),
+                    "name": tray.get("tray_sub_brands", tray.get("tray_type", "PLA")),
+                })
+
     return jsonify({"ok": True, "slots": slots})
 
 
